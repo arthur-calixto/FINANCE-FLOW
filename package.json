@@ -1,0 +1,30 @@
+{
+  "name": "finance-flow",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "eslint apps packages *.mjs prisma.config.ts --max-warnings 0 && turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write apps packages docs prisma.config.ts *.mjs *.json *.yaml docker-compose.yml README.md",
+    "format:check": "prettier --check apps packages docs prisma.config.ts *.mjs *.json *.yaml docker-compose.yml README.md",
+    "db:validate": "prisma validate",
+    "db:format": "prisma format",
+    "db:migrate": "prisma migrate deploy",
+    "db:test": "sh prisma/tests/run.sh"
+  },
+  "devDependencies": {
+    "@finance-flow/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "dotenv": "^17.0.0",
+    "eslint": "^10.0.0",
+    "prettier": "^3.0.0",
+    "prisma": "^7.0.0",
+    "turbo": "^2.11.5",
+    "typescript": "~5.9.3"
+  }
+}

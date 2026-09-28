@@ -1,0 +1,26 @@
+{
+  "name": "@finance-flow/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --watch --watch-path=src --watch-path=../../packages/types/dist --watch-path=../../packages/validation/dist dev.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@finance-flow/types": "workspace:*",
+    "@finance-flow/validation": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@finance-flow/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.3"
+  }
+}
