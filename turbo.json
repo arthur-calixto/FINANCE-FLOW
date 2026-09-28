@@ -1,19 +1,33 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": [".env"],
+  "globalDependencies": [".env", "prisma/schema.prisma", "prisma.config.ts"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", "src/generated/**"],
+      "env": [
+        "DATABASE_URL",
+        "VITE_SUPABASE_URL",
+        "VITE_SUPABASE_PUBLISHABLE_KEY",
+        "VITE_API_URL"
+      ]
     },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true,
-      "env": ["API_PORT", "WEB_ORIGIN"]
+      "env": [
+        "API_PORT",
+        "WEB_ORIGIN",
+        "DATABASE_URL",
+        "SUPABASE_URL",
+        "VITE_SUPABASE_URL",
+        "VITE_SUPABASE_PUBLISHABLE_KEY",
+        "VITE_API_URL"
+      ]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["build"]
     },
     "test": {
       "dependsOn": ["build"],

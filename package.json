@@ -15,7 +15,9 @@
     "db:validate": "prisma validate",
     "db:format": "prisma format",
     "db:migrate": "prisma migrate deploy",
-    "db:test": "sh prisma/tests/run.sh"
+    "db:test": "sh prisma/tests/run.sh",
+    "db:generate": "prisma generate",
+    "test:database": "pnpm --filter @finance-flow/api test:database"
   },
   "devDependencies": {
     "@finance-flow/config": "workspace:*",

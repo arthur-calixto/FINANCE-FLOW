@@ -1,5 +1,11 @@
 // Schema v1. Invariantes e decisões: docs/database.md.
 // CHECKs são mantidos manualmente na migration SQL; Prisma 7 não os expressa aqui.
+generator client {
+  provider     = "prisma-client"
+  output       = "../apps/api/src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -55,6 +61,8 @@ enum InvoiceStatus {
 }
 
 model User {
+  /// Identidade Supabase explícita; nullable apenas para registros legados não vinculados.
+  authUserId               String?            @unique @db.Uuid
   id                       String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                    String             @unique
   name                     String

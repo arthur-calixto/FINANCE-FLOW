@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">F</div>
+          <div>
+            <p class="eyebrow">Personal</p>
+            <h1>Finance Flow</h1>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-item active">Overview</button>
+          <button class="nav-item">Accounts</button>
+          <button class="nav-item">Budgets</button>
+          <button class="nav-item">Analytics</button>
+          <button class="nav-item">Settings</button>
+        </nav>
+
+        <div class="card mini-card">
+          <p class="label">Monthly goal</p>
+          <h3>$8,400</h3>
+          <div class="progress-bar">
+            <span style="width: 72%"></span>
+          </div>
+          <small>72% reached</small>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Welcome back</p>
+            <h2>Financial overview</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button">Export</button>
+            <button class="primary-button">+ Add expense</button>
+          </div>
+        </header>
+
+        <section class="stats-grid" id="statsGrid"></section>
+
+        <section class="content-grid">
+          <div class="panel chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="label">Cash flow</p>
+                <h3>Income vs expenses</h3>
+              </div>
+              <select aria-label="Select month">
+                <option>September</option>
+                <option>August</option>
+                <option>July</option>
+              </select>
+            </div>
+            <div class="chart-bars" id="chartBars"></div>
+          </div>
+
+          <div class="panel sidebar-panel">
+            <div class="panel-header">
+              <div>
+                <p class="label">Budget</p>
+                <h3>Spending categories</h3>
+              </div>
+            </div>
+            <div id="budgetList" class="budget-list"></div>
+          </div>
+        </section>
+
+        <section class="panel transactions-panel">
+          <div class="panel-header">
+            <div>
+              <p class="label">Transactions</p>
+              <h3>Latest activity</h3>
+            </div>
+            <button class="ghost-button">View all</button>
+          </div>
+
+          <div class="transaction-form-wrap">
+            <form id="transactionForm" class="transaction-form">
+              <input
+                id="txnName"
+                type="text"
+                placeholder="Description"
+                required
+              />
+              <select id="txnType">
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+              <input
+                id="txnAmount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Amount"
+                required
+              />
+              <button type="submit" class="primary-button">Add</button>
+            </form>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody id="transactionTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

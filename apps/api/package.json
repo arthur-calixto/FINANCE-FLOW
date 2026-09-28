@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env --watch --watch-path=src --watch-path=../../packages/types/dist --watch-path=../../packages/validation/dist dev.mjs",
-    "build": "tsc -p tsconfig.json",
+    "dev": "pnpm --workspace-root db:generate && node --env-file-if-exists=../../.env --watch --watch-path=src --watch-path=../../packages/types/dist --watch-path=../../packages/validation/dist dev.mjs",
+    "build": "pnpm --workspace-root db:generate && tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:database": "node --env-file=../../.env --test test/database.integration.mjs"
   },
   "dependencies": {
     "@finance-flow/types": "workspace:*",
@@ -16,7 +17,10 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "jose": "^6.0.0"
   },
   "devDependencies": {
     "@finance-flow/config": "workspace:*",
