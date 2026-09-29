@@ -21,7 +21,7 @@ export class WorkspaceGuard implements CanActivate {
     const parsed = uuidSchema.safeParse(req.headers['x-workspace-id']);
     if (!parsed.success)
       throw new BadRequestException('X-Workspace-Id deve ser um UUID');
-    if (req.params.id && req.params.id !== parsed.data)
+    if (req.params.workspaceId && req.params.workspaceId !== parsed.data)
       throw new BadRequestException(
         'Workspace da rota e do header devem coincidir',
       );

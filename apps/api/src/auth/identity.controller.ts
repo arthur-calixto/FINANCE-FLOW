@@ -23,7 +23,7 @@ export class IdentityController {
     const user = await this.identities.bootstrap(identity);
     return this.workspaces.list(user.id);
   }
-  @Get('workspaces/:id')
+  @Get('workspaces/:workspaceId')
   @UseGuards(WorkspaceGuard)
   detail(@CurrentWorkspace() workspace: WorkspaceSummary) {
     return workspace;

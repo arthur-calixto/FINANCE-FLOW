@@ -1,3 +1,6 @@
+import { AppShell, Overview } from './Shell';
+import { Accounts } from './resources/Accounts';
+import { Categories } from './resources/Categories';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
@@ -108,115 +111,78 @@ function AuthForm({
     }
   }
   return (
-    <section>
-      <h2>{title}</h2>
-      {mode === 'reset' && !auth.session ? (
-        <p role="status">
-          Abra o link de recuperação enviado por e-mail. Se expirou,{' '}
-          <Link to="/forgot-password">solicite outro</Link>.
-        </p>
-      ) : (
-        <form onSubmit={submit}>
-          {mode === 'register' && (
-            <label>
-              Nome
-              <input name="name" autoComplete="name" required maxLength={120} />
-            </label>
-          )}
-          {mode !== 'reset' && (
-            <label>
-              E-mail
-              <input name="email" type="email" autoComplete="email" required />
-            </label>
-          )}
-          {mode !== 'forgot' && (
-            <label>
-              Senha
-              <input
-                name="password"
-                type="password"
-                autoComplete={
-                  mode === 'login' ? 'current-password' : 'new-password'
-                }
-                required
-                minLength={mode === 'login' ? 1 : 8}
-              />
-            </label>
-          )}
-          {(mode === 'register' || mode === 'reset') && (
-            <label>
-              Confirmar senha
-              <input
-                name="confirmation"
-                type="password"
-                autoComplete="new-password"
-                required
-              />
-            </label>
-          )}
-          <button disabled={busy}>{busy ? 'Aguarde…' : title}</button>
-        </form>
-      )}
-      {error && <p role="alert">{error}</p>}
-      {message && <p role="status">{message}</p>}
-      <nav>
-        <Link to="/login">Entrar</Link>
-        <Link to="/register">Criar conta</Link>
-        <Link to="/forgot-password">Esqueci minha senha</Link>
-      </nav>
-    </section>
-  );
-}
-function Home() {
-  const auth = useAuth();
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  async function run(action: () => Promise<void>) {
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Tente novamente.');
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (auth.error)
-    return (
-      <section>
-        <p role="alert">{auth.error}</p>
-        <button onClick={auth.retry}>Tentar novamente</button>
-        <button onClick={() => void run(auth.signOut)}>Sair</button>
+    <main className="auth-page">
+      <Link className="auth-brand" to="/login">
+        FINANCE FLOW
+      </Link>
+      <section className="card">
+        <h2>{title}</h2>
+        {mode === 'reset' && !auth.session ? (
+          <p role="status">
+            Abra o link de recuperação enviado por e-mail. Se expirou,{' '}
+            <Link to="/forgot-password">solicite outro</Link>.
+          </p>
+        ) : (
+          <form onSubmit={submit}>
+            {mode === 'register' && (
+              <label>
+                Nome
+                <input
+                  name="name"
+                  autoComplete="name"
+                  required
+                  maxLength={120}
+                />
+              </label>
+            )}
+            {mode !== 'reset' && (
+              <label>
+                E-mail
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                />
+              </label>
+            )}
+            {mode !== 'forgot' && (
+              <label>
+                Senha
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete={
+                    mode === 'login' ? 'current-password' : 'new-password'
+                  }
+                  required
+                  minLength={mode === 'login' ? 1 : 8}
+                />
+              </label>
+            )}
+            {(mode === 'register' || mode === 'reset') && (
+              <label>
+                Confirmar senha
+                <input
+                  name="confirmation"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+            )}
+            <button disabled={busy}>{busy ? 'Aguarde…' : title}</button>
+          </form>
+        )}
         {error && <p role="alert">{error}</p>}
+        {message && <p role="status">{message}</p>}
+        <nav>
+          <Link to="/login">Entrar</Link>
+          <Link to="/register">Criar conta</Link>
+          <Link to="/forgot-password">Esqueci minha senha</Link>
+        </nav>
       </section>
-    );
-  return (
-    <section>
-      <h2>Olá, {auth.me?.user.name}</h2>
-      <label>
-        Workspace
-        <select
-          aria-label="Workspace"
-          value={auth.activeWorkspaceId ?? ''}
-          disabled={busy}
-          onChange={(e) => void run(() => auth.switchWorkspace(e.target.value))}
-        >
-          {auth.me?.workspaces.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!auth.me?.workspaces.length && (
-        <p>Você não possui workspaces disponíveis.</p>
-      )}
-      <button disabled={busy} onClick={() => void run(auth.signOut)}>
-        Sair
-      </button>
-      {error && <p role="alert">{error}</p>}
-    </section>
+    </main>
   );
 }
 export function AppRoutes() {
@@ -239,19 +205,21 @@ export function AppRoutes() {
         path="/app"
         element={
           <ProtectedRoute>
-            <Home />
+            <AppShell />
           </ProtectedRoute>
         }
-      />
+      >
+        <Route index element={<Overview />} />
+        <Route path="accounts" element={<Accounts />} />
+        <Route path="categories" element={<Categories />} />
+      </Route>
       <Route path="*" element={<Navigate to="/app" replace />} />
     </Routes>
   );
 }
 export default function App() {
   return (
-    <main>
-      <h1>FINANCE FLOW</h1>
-      <p>Gestão financeira pessoal e familiar.</p>
+    <>
       {configurationError ? (
         <p role="alert">{configurationError}</p>
       ) : (
@@ -261,6 +229,6 @@ export default function App() {
           </AuthProvider>
         </BrowserRouter>
       )}
-    </main>
+    </>
   );
 }

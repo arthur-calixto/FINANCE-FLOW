@@ -7,7 +7,13 @@ export class ApiError extends Error {
         ? 'Sessão inválida. Entre novamente.'
         : status === 403
           ? 'Você não tem acesso a este workspace.'
-          : 'Não foi possível carregar seus dados. Tente novamente.',
+          : status === 400
+            ? 'Confira os dados. O responsável ou categoria pai deve pertencer a este workspace; categorias precisam ter o mesmo tipo e não podem formar ciclos.'
+            : status === 404
+              ? 'Registro não encontrado neste workspace.'
+              : status === 409
+                ? 'Conflito ao salvar. Atualize a página e tente novamente.'
+                : 'Não foi possível carregar seus dados. Tente novamente.',
     );
   }
 }
@@ -15,13 +21,25 @@ export async function apiRequest(
   path: string,
   workspaceId?: string,
   signal?: AbortSignal,
+  options?: { method: 'POST' | 'PATCH' | 'DELETE'; body?: unknown },
 ) {
   const { data } = await supabase!.auth.getSession();
   if (!data.session) throw new ApiError(401);
   const response = await fetch(
     `${import.meta.env.VITE_API_URL ?? 'http://localhost:3000'}${path}`,
     {
+      ...(options
+        ? {
+            method: options.method,
+            ...(options.body !== undefined
+              ? { body: JSON.stringify(options.body) }
+              : {}),
+          }
+        : {}),
       headers: {
+        ...(options?.body !== undefined
+          ? { 'Content-Type': 'application/json' }
+          : {}),
         Authorization: `Bearer ${data.session.access_token}`,
         ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}),
       },

@@ -1,7 +1,7 @@
 # FINANCE FLOW
 
 Fundação de um sistema Web-first de gestão financeira pessoal e familiar.
-O projeto contém a fundação técnica, schema financeiro v1 e autenticação via Supabase com contexto de workspace. Sem funcionalidades financeiras, dashboard ou aplicativo mobile.
+O projeto contém a fundação técnica, schema financeiro v1 e autenticação via Supabase com contexto de workspace. A Task 04 adiciona gerenciamento de contas e categorias, sem lançamentos, dashboard financeiro ou aplicativo mobile.
 
 ## Arquitetura
 
@@ -90,3 +90,7 @@ O Turborepo ordena os builds de dependências e mantém cache. O lint inclui ESL
 Após `pnpm build`, execute a API com `pnpm --filter @finance-flow/api start` e confira a Web compilada com `pnpm --filter @finance-flow/web preview` (preview local, não servidor de produção).
 
 O lockfile deve ser versionado; em CI use `pnpm install --frozen-lockfile`.
+
+## Contas e categorias
+
+A área autenticada possui `/app/accounts` e `/app/categories`. Ambas usam o workspace ativo e oferecem criação, edição, desativação e reativação. A API expõe GET/POST nas coleções e GET/PATCH/DELETE nos detalhes, protegidos por JWT e `X-Workspace-Id`. Veja [conceitos, regras, testes e screenshots](docs/accounts-and-categories.md).

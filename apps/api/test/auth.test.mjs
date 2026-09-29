@@ -51,7 +51,13 @@ test('endpoints protegidos rejeitam ausência de JWT e JWT inválido', async () 
   try {
     await app.listen(0, '127.0.0.1');
     const base = await app.getUrl();
-    for (const path of ['/me', '/workspaces', `/workspaces/${randomUUID()}`]) {
+    for (const path of [
+      '/me',
+      '/workspaces',
+      '/accounts',
+      '/categories',
+      `/workspaces/${randomUUID()}`,
+    ]) {
       assert.equal((await fetch(base + path)).status, 401);
       assert.equal(
         (

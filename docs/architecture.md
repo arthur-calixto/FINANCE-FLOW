@@ -9,3 +9,5 @@ Turborepo ordena builds e mantém cache dos artefatos. O modo dev compila depend
 PostgreSQL roda em Docker com volume persistente e porta acessível apenas no host local. Prisma contém o [schema financeiro v1 e a migration inicial](database.md), com Workspace como tenant e FKs compostas para integridade entre entidades financeiras. A API gera Prisma Client e usa o adapter PostgreSQL para bootstrap do usuário e consulta de membership. Supabase fornece somente Auth; a API valida JWT via JWKS. Veja [autenticação](authentication.md).
 
 Vite resolve o pacote de validação para seu fonte TypeScript, permitindo ESM e HMR na Web. A API usa a saída CommonJS compilada do mesmo pacote.
+
+A Task 04 introduz o shell autenticado e os módulos de contas/categorias, reutilizando os guards e o schema. Consultas são limitadas ao workspace; escrita exige papel diferente de VIEWER. A hierarquia de categorias é validada em transação com lock por tenant. Detalhes em [contas e categorias](accounts-and-categories.md).
