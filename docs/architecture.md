@@ -13,3 +13,5 @@ Vite resolve os pacotes de tipos/helpers e validação para seus fontes TypeScri
 A Task 04 introduz o shell autenticado e os módulos de contas/categorias, reutilizando os guards e o schema. Consultas são limitadas ao workspace; escrita exige papel diferente de VIEWER. A hierarquia de categorias é validada em transação com lock por tenant. Detalhes em [contas e categorias](accounts-and-categories.md).
 
 A Task 05 adiciona TransactionsService e a tela de lançamentos simples. Competência deriva do vencimento, datas civis são preservadas e atraso é calculado na leitura no contexto de São Paulo. Baixas e reaberturas usam transações com bloqueio de linha; relatórios somam NUMERIC no PostgreSQL. Contratos, helper de dia brasileiro e schemas são compartilhados. Veja [lançamentos](transactions.md).
+
+A Task 06 introduz CreditCardsService, calendário central no backend e telas de cartões/faturas. Pagamento integral usa a própria CreditCardInvoice para registrar conta e valor de caixa, mantendo Transactions como única fonte de despesas econômicas. Locks transacionais protegem limite, unicidade e liquidação. Veja [cartões e faturas](credit-cards.md).

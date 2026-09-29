@@ -19,7 +19,7 @@ Todos os endpoints exigem JWT válido, `X-Workspace-Id` e membership. OWNER, ADM
 
 Filtros: `month=YYYY-MM`, `type`, `status`, `accountId`, `categoryId` e `search` por descrição (sem distinguir maiúsculas). Filtros são combinados por AND. Sem mês, a API lista todos os lançamentos simples do workspace. A Web sempre informa mês, possui filtros de tipo/status/conta/categoria e navegação mensal. Cancelados ficam consultáveis e identificados; não entram nos totais.
 
-Os campos de cartão, fatura, parcelamento e recorrência não são aceitos. As consultas deste módulo excluem registros que utilizem esses vínculos, preservando os fluxos futuros.
+Na criação/edição bancária, os campos de cartão, fatura, parcelamento e recorrência não são aceitos. A Task 06 inclui compras simples no cartão nas consultas e no resumo, com indicação e link da fatura. Mutações bancárias não alteram essas compras: baixa ocorre pela fatura, e cancelamento pela rota do cartão. Parcelamentos e recorrências seguem fora destas consultas. Veja [cartões e faturas](credit-cards.md).
 
 ## Criação e edição
 

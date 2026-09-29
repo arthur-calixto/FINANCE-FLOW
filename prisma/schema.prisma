@@ -116,24 +116,25 @@ model WorkspaceMember {
 }
 
 model Account {
-  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId        String             @db.Uuid
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId        String              @db.Uuid
   name               String
   type               AccountType
-  initialBalance     Decimal            @default(0) @db.Decimal(19, 2)
-  currency           String             @default("BRL") @db.VarChar(3)
-  ownerMemberId      String?            @db.Uuid
-  isActive           Boolean            @default(true)
-  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
-  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  ownerMember        WorkspaceMember?   @relation(fields: [workspaceId, ownerMemberId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  initialBalance     Decimal             @default(0) @db.Decimal(19, 2)
+  currency           String              @default("BRL") @db.VarChar(3)
+  ownerMemberId      String?             @db.Uuid
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ownerMember        WorkspaceMember?    @relation(fields: [workspaceId, ownerMemberId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
   transactions       Transaction[]
   installmentGroups  InstallmentGroup[]
   recurrences        Recurrence[]
+  invoicePayments    CreditCardInvoice[]
   paymentCreditCards CreditCard[]
-  outgoingTransfers  Transfer[]         @relation("TransferSource")
-  incomingTransfers  Transfer[]         @relation("TransferDestination")
+  outgoingTransfers  Transfer[]          @relation("TransferSource")
+  incomingTransfers  Transfer[]          @relation("TransferDestination")
 
   @@unique([workspaceId, id])
   @@index([workspaceId, ownerMemberId])
@@ -302,24 +303,29 @@ model CreditCard {
 }
 
 model CreditCardInvoice {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId    String        @db.Uuid
-  creditCardId   String        @db.Uuid
-  referenceMonth DateTime      @db.Date
-  closingDate    DateTime      @db.Date
-  dueDate        DateTime      @db.Date
-  status         InvoiceStatus @default(OPEN)
-  paidAt         DateTime?     @db.Timestamptz(3)
-  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
-  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  transactions   Transaction[]
-  creditCard     CreditCard    @relation(fields: [workspaceId, creditCardId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String        @db.Uuid
+  creditCardId     String        @db.Uuid
+  referenceMonth   DateTime      @db.Date
+  closingDate      DateTime      @db.Date
+  dueDate          DateTime      @db.Date
+  status           InvoiceStatus @default(OPEN)
+  paidAt           DateTime?     @db.Timestamptz(3)
+  /// Liquidação de caixa; não é uma segunda despesa.
+  paymentAccountId String?       @db.Uuid
+  paidAmount       Decimal?      @db.Decimal(19, 2)
+  paymentAccount   Account?      @relation(fields: [workspaceId, paymentAccountId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  transactions     Transaction[]
+  creditCard       CreditCard    @relation(fields: [workspaceId, creditCardId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([workspaceId, id])
   @@unique([creditCardId, referenceMonth])
   @@index([workspaceId, status, dueDate])
   @@index([workspaceId, creditCardId])
+  @@index([workspaceId, paymentAccountId])
 }
 
 /// CHECKs SQL: amount positivo e contas de origem/destino diferentes.

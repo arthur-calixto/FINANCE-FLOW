@@ -46,6 +46,10 @@ export interface CategoryRecord {
 
 export type TransactionStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 export interface TransactionRecord {
+  creditCardId?: string | null;
+  invoiceId?: string | null;
+  creditCard?: { id: string; name: string } | null;
+  invoice?: { id: string; referenceMonth: string } | null;
   id: string;
   workspaceId: string;
   description: string;
@@ -80,4 +84,38 @@ export function brazilToday(now = new Date()): string {
   }).formatToParts(now);
   const part = (type: string) => parts.find((p) => p.type === type)!.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+export interface InvoicePreview {
+  referenceMonth: string;
+  closingDate: string;
+  dueDate: string;
+}
+export interface InvoiceRecord extends InvoicePreview {
+  id: string;
+  workspaceId: string;
+  creditCardId: string;
+  status: 'OPEN' | 'CLOSED' | 'PAID' | 'OVERDUE';
+  total: string;
+  purchaseCount: number;
+  paidAt: string | null;
+  paidAmount: string | null;
+  paymentAccountId: string | null;
+  paymentAccount?: { id: string; name: string } | null;
+}
+export interface CreditCardRecord {
+  id: string;
+  workspaceId: string;
+  name: string;
+  creditLimit: string;
+  closingDay: number;
+  dueDay: number;
+  isActive: boolean;
+  usedLimit: string;
+  availableLimit: string;
+  currentInvoice: InvoiceRecord | null;
+}
+export interface InvoiceDetail extends InvoiceRecord {
+  creditCard: { id: string; name: string };
+  purchases: TransactionRecord[];
 }

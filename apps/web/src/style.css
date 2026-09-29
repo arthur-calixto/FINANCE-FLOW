@@ -852,3 +852,68 @@ dialog::backdrop {
     min-width: 0;
   }
 }
+
+.card-limits {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1.5rem 0;
+}
+.card-limits div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.card-limits dt {
+  color: var(--muted);
+}
+.card-limits dd {
+  margin: 0;
+  font-weight: 700;
+}
+.current-invoice {
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f1f6ed;
+  margin-top: 1rem;
+}
+.current-invoice h3 {
+  text-transform: capitalize;
+  margin: 0.5rem 0;
+}
+.invoice-history {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1.5rem;
+  max-width: 100%;
+}
+.invoice-history a {
+  display: grid;
+  gap: 0.4rem;
+  flex: 0 0 200px;
+  padding: 1rem;
+  border: 1px solid #dce5df;
+  border-radius: 12px;
+  background: white;
+  text-decoration: none;
+}
+.invoice-history strong {
+  text-transform: capitalize;
+}
+.invoice-detail {
+  margin-bottom: 1.5rem;
+}
+.invoice-total {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.invoice-total strong {
+  font-size: 2rem;
+}
+.invoice-detail h2 {
+  text-transform: capitalize;
+}
+.accounts-grid .card-actions {
+  flex-wrap: wrap;
+}

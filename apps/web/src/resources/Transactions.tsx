@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type {
@@ -593,7 +594,9 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
                   </div>
                   <p>
                     {row.category?.name ?? 'Sem categoria'} ·{' '}
-                    {row.account?.name ?? 'Sem conta'}
+                    {row.creditCard
+                      ? `Cartão ${row.creditCard.name}`
+                      : (row.account?.name ?? 'Sem conta')}
                   </p>
                   <p>
                     Vencimento:{' '}
@@ -633,40 +636,50 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
                         </span>
                       )}
                   </div>
-                  {writable && row.status !== 'CANCELLED' && (
-                    <div className="card-actions">
-                      {row.status === 'PAID' ? (
-                        <Button
-                          variant="quiet"
-                          onClick={() => setEditor({ kind: 'reopen', row })}
-                        >
-                          Reabrir
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            variant="quiet"
-                            onClick={() =>
-                              setEditor({ kind: 'edit', row, type: row.type })
-                            }
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="quiet"
-                            onClick={() => setEditor({ kind: 'cancel', row })}
-                          >
-                            Cancelar lançamento
-                          </Button>
-                          <Button
-                            onClick={() => setEditor({ kind: 'pay', row })}
-                          >
-                            {row.type === 'INCOME' ? 'Receber' : 'Pagar'}
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                  {row.creditCardId && row.invoiceId && (
+                    <Link
+                      className="button button-secondary"
+                      to={`/app/credit-cards/${row.creditCardId}/invoices/${row.invoiceId}`}
+                    >
+                      Fatura {monthLabel(row.competenceDate.slice(0, 7))}
+                    </Link>
                   )}
+                  {writable &&
+                    !row.creditCardId &&
+                    row.status !== 'CANCELLED' && (
+                      <div className="card-actions">
+                        {row.status === 'PAID' ? (
+                          <Button
+                            variant="quiet"
+                            onClick={() => setEditor({ kind: 'reopen', row })}
+                          >
+                            Reabrir
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="quiet"
+                              onClick={() =>
+                                setEditor({ kind: 'edit', row, type: row.type })
+                              }
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="quiet"
+                              onClick={() => setEditor({ kind: 'cancel', row })}
+                            >
+                              Cancelar lançamento
+                            </Button>
+                            <Button
+                              onClick={() => setEditor({ kind: 'pay', row })}
+                            >
+                              {row.type === 'INCOME' ? 'Receber' : 'Pagar'}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
                 </Card>
               ))}
             </div>

@@ -17,6 +17,8 @@ import { databaseOperation } from './database-errors';
 const date = (v: string) => new Date(`${v}T00:00:00.000Z`);
 const civil = (v: Date) => v.toISOString().slice(0, 10);
 const relations = {
+  creditCard: { select: { id: true, name: true } },
+  invoice: { select: { id: true, referenceMonth: true } },
   account: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
 } as const;
@@ -53,7 +55,9 @@ export class TransactionsService {
     const today = date(brazilToday());
     return {
       workspaceId,
-      ...simple,
+      installmentGroupId: null,
+      recurrenceId: null,
+      installmentNumber: null,
       ...(q.month ? { competenceDate: date(`${q.month}-01`) } : {}),
       ...(q.type ? { type: q.type } : {}),
       ...(q.accountId ? { accountId: q.accountId } : {}),
@@ -81,7 +85,13 @@ export class TransactionsService {
   }
   async get(workspaceId: string, id: string) {
     const row = await this.prisma.client.transaction.findFirst({
-      where: { workspaceId, id, ...simple },
+      where: {
+        workspaceId,
+        id,
+        installmentGroupId: null,
+        recurrenceId: null,
+        installmentNumber: null,
+      },
       include: relations,
     });
     if (!row) throw new NotFoundException('Lançamento não encontrado.');

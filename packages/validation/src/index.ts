@@ -170,3 +170,47 @@ export type CreateTransaction = z.infer<typeof createTransactionSchema>;
 export type UpdateTransaction = z.infer<typeof updateTransactionSchema>;
 export type PayTransaction = z.infer<typeof payTransactionSchema>;
 export type TransactionQuery = z.infer<typeof transactionListSchema>;
+
+export const nonnegativeMoneySchema = moneySchema.refine(
+  (v) => !v.startsWith('-'),
+  'O valor não pode ser negativo',
+);
+const cardFields = z
+  .object({
+    name: resourceName,
+    creditLimit: nonnegativeMoneySchema,
+    closingDay: z.number().int().min(1).max(31),
+    dueDay: z.number().int().min(1).max(31),
+  })
+  .strict();
+export const createCreditCardSchema = cardFields;
+export const updateCreditCardSchema = cardFields
+  .partial()
+  .extend({ isActive: z.boolean().optional() })
+  .refine((v) => Object.keys(v).length > 0, 'Informe ao menos um campo');
+export const createPurchaseSchema = z
+  .object({
+    description: z.string().trim().min(1).max(500),
+    amount: positiveMoneySchema,
+    transactionDate: civilDateSchema,
+    categoryId: uuidSchema,
+    notes: z.string().trim().max(5000).nullable().optional(),
+  })
+  .strict();
+export const purchasePreviewSchema = z
+  .object({ transactionDate: civilDateSchema })
+  .strict();
+export const invoiceListSchema = z
+  .object({ month: monthSchema.optional() })
+  .strict();
+export const payInvoiceSchema = z
+  .object({
+    accountId: uuidSchema,
+    amount: positiveMoneySchema.optional(),
+    paidAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+export type CreateCreditCard = z.infer<typeof createCreditCardSchema>;
+export type UpdateCreditCard = z.infer<typeof updateCreditCardSchema>;
+export type CreatePurchase = z.infer<typeof createPurchaseSchema>;
+export type PayInvoice = z.infer<typeof payInvoiceSchema>;

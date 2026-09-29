@@ -1,3 +1,5 @@
+import { CreditCards } from './resources/CreditCards';
+import { CardInvoices } from './resources/CardInvoices';
 import { Transactions } from './resources/Transactions';
 import { AppShell, Overview } from './Shell';
 import { Accounts } from './resources/Accounts';
@@ -211,6 +213,15 @@ export function AppRoutes() {
         }
       >
         <Route index element={<Overview />} />
+        <Route path="credit-cards" element={<CreditCards />} />
+        <Route
+          path="credit-cards/:cardId/invoices"
+          element={<CardInvoices />}
+        />
+        <Route
+          path="credit-cards/:cardId/invoices/:invoiceId"
+          element={<CardInvoices />}
+        />
         <Route path="transactions" element={<Transactions />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="categories" element={<Categories />} />

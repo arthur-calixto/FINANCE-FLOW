@@ -157,3 +157,7 @@ A estratégia de FKs segue o [modo foreignKeys do Prisma](https://docs.prisma.io
 ## Aplicação na Task 05
 
 TransactionsService implementa as invariantes de valores, baixa e autoria para lançamentos simples; exige conta e categoria compatíveis do workspace e deriva competência do vencimento. OVERDUE é efetivo na leitura. CategoriesService passa a proteger também o tipo de categorias com lançamentos existentes. Nenhuma migration ou alteração de schema foi necessária. Veja [regras e contratos completos](transactions.md).
+
+## Liquidação de fatura — Task 06
+
+Migration aditiva `20260929130000_invoice_payment` acrescenta paymentAccountId e paidAmount à CreditCardInvoice, relação reversa em Account, FK composta e CHECKs de integridade. O service garante cartão/fatura/workspace coerentes, compras pagas atomicamente e registro de caixa sem nova EXPENSE. Detalhes e limitações de históricos legados em [cartões e faturas](credit-cards.md).

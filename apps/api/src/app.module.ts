@@ -1,3 +1,5 @@
+import { CreditCardsController } from './resources/credit-cards.controller';
+import { CreditCardsService } from './resources/credit-cards.service';
 import { TransactionsController } from './resources/transactions.controller';
 import { TransactionsService } from './resources/transactions.service';
 import { AccountsController } from './resources/accounts.controller';
@@ -21,12 +23,14 @@ import { IdentityController } from './auth/identity.controller';
     AccountsController,
     CategoriesController,
     TransactionsController,
+    CreditCardsController,
   ],
   providers: [
     PrismaService,
     AccountsService,
     CategoriesService,
     TransactionsService,
+    CreditCardsService,
     WriteGuard,
     JwtVerifier,
     AuthGuard,

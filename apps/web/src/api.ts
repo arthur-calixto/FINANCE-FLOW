@@ -1,19 +1,23 @@
 import { supabase } from './supabase';
 import { meSchema, workspaceSchema } from '@finance-flow/validation';
 export class ApiError extends Error {
-  constructor(public status: number) {
+  constructor(
+    public status: number,
+    message?: string,
+  ) {
     super(
-      status === 401
-        ? 'Sessão inválida. Entre novamente.'
-        : status === 403
-          ? 'Você não tem acesso a este workspace.'
-          : status === 400
-            ? 'Confira valores, datas e vínculos. Selecione conta e categoria válidas deste workspace e de tipo compatível.'
-            : status === 404
-              ? 'Registro não encontrado neste workspace.'
-              : status === 409
-                ? 'Operação incompatível com o estado atual. Reabra lançamentos pagos antes de editar ou cancelar e atualize a página.'
-                : 'Não foi possível carregar seus dados. Tente novamente.',
+      message ??
+        (status === 401
+          ? 'Sessão inválida. Entre novamente.'
+          : status === 403
+            ? 'Você não tem acesso a este workspace.'
+            : status === 400
+              ? 'Confira valores, datas e vínculos. Selecione conta e categoria válidas deste workspace e de tipo compatível.'
+              : status === 404
+                ? 'Registro não encontrado neste workspace.'
+                : status === 409
+                  ? 'Operação incompatível com o estado atual. Reabra lançamentos pagos antes de editar ou cancelar e atualize a página.'
+                  : 'Não foi possível carregar seus dados. Tente novamente.'),
     );
   }
 }
@@ -46,7 +50,33 @@ export async function apiRequest(
       signal,
     },
   );
-  if (!response.ok) throw new ApiError(response.status);
+  if (!response.ok) {
+    const allowed = new Set([
+      'A compra ultrapassa o limite disponível.',
+      'O limite não pode ficar abaixo do valor utilizado.',
+      'Dias de virada e vencimento não podem mudar após criar faturas.',
+      'Ative o cartão antes de registrar compras.',
+      'Selecione uma categoria de despesa ativa deste workspace.',
+      'Não é possível adicionar compras a uma fatura paga.',
+      'Compras de faturas pagas não podem ser canceladas.',
+      'Esta fatura já foi paga.',
+      'Selecione uma conta ativa deste workspace.',
+      'O pagamento deve corresponder ao total integral da fatura.',
+      'Não há valor a pagar nesta fatura.',
+    ]);
+    let message: string | undefined;
+    if (
+      path.startsWith('/credit-cards') &&
+      [400, 409].includes(response.status)
+    ) {
+      const body = (await response.json().catch(() => null)) as {
+        message?: unknown;
+      } | null;
+      if (typeof body?.message === 'string' && allowed.has(body.message))
+        message = body.message;
+    }
+    throw new ApiError(response.status, message);
+  }
   return response.json() as Promise<unknown>;
 }
 export async function getMe(signal?: AbortSignal) {

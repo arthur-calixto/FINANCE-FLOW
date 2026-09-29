@@ -66,10 +66,9 @@ export function AppShell() {
           <NavLink to="/app/accounts">
             ▣ <span>Contas</span>
           </NavLink>
-          <span aria-disabled="true" className="nav-disabled">
+          <NavLink to="/app/credit-cards">
             ▤ <span>Cartões</span>
-            <small>Em breve</small>
-          </span>
+          </NavLink>
           <NavLink to="/app/categories">
             ⌑ <span>Categorias</span>
           </NavLink>

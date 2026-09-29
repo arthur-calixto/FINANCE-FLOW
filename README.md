@@ -1,7 +1,7 @@
 # FINANCE FLOW
 
 Fundação de um sistema Web-first de gestão financeira pessoal e familiar.
-O projeto contém a fundação técnica, schema financeiro v1 e autenticação via Supabase com contexto de workspace. As Tasks 04–05 adicionam contas, categorias e lançamentos simples de receitas/despesas, com competência por vencimento, baixa e resumo mensal. Não há dashboard financeiro ou aplicativo mobile.
+O projeto contém a fundação técnica, schema financeiro v1 e autenticação via Supabase com contexto de workspace. As Tasks 04–06 adicionam contas, categorias, lançamentos simples e cartões/faturas, com competência por vencimento, baixa e resumo mensal. Não há dashboard financeiro ou aplicativo mobile.
 
 ## Arquitetura
 
@@ -98,3 +98,7 @@ A área autenticada possui `/app/accounts` e `/app/categories`. Ambas usam o wor
 ## Lançamentos
 
 `/app/transactions` permite criar receitas/despesas, alternar competência, filtrar, editar, pagar/receber, reabrir e cancelar. A API disponibiliza CRUD em `/transactions`, operações `/pay` e `/reopen` e `/transactions/summary?month=YYYY-MM`. Veja [contratos, datas, estados e validação](docs/transactions.md).
+
+## Cartões e faturas
+
+`/app/credit-cards` oferece cadastro, limite, compras à vista, faturas atuais/futuras e pagamento integral. A liquidação registra saída de caixa na fatura sem criar outra despesa. Execute `pnpm db:migrate` para aplicar a migration aditiva de pagamento. Veja [calendário, API, limite e liquidação](docs/credit-cards.md).
