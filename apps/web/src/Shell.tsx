@@ -60,10 +60,9 @@ export function AppShell() {
           <NavLink to="/app" end>
             ⌂ <span>Visão geral</span>
           </NavLink>
-          <span aria-disabled="true" className="nav-disabled">
+          <NavLink to="/app/transactions">
             ↗ <span>Lançamentos</span>
-            <small>Em breve</small>
-          </span>
+          </NavLink>
           <NavLink to="/app/accounts">
             ▣ <span>Contas</span>
           </NavLink>

@@ -1,3 +1,5 @@
+import { TransactionsController } from './resources/transactions.controller';
+import { TransactionsService } from './resources/transactions.service';
 import { AccountsController } from './resources/accounts.controller';
 import { AccountsService } from './resources/accounts.service';
 import { CategoriesController } from './resources/categories.controller';
@@ -18,11 +20,13 @@ import { IdentityController } from './auth/identity.controller';
     IdentityController,
     AccountsController,
     CategoriesController,
+    TransactionsController,
   ],
   providers: [
     PrismaService,
     AccountsService,
     CategoriesService,
+    TransactionsService,
     WriteGuard,
     JwtVerifier,
     AuthGuard,

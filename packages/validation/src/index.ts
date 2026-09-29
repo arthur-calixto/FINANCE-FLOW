@@ -117,3 +117,56 @@ export type CreateAccount = z.infer<typeof createAccountSchema>;
 export type UpdateAccount = z.infer<typeof updateAccountSchema>;
 export type CreateCategory = z.infer<typeof createCategorySchema>;
 export type UpdateCategory = z.infer<typeof updateCategorySchema>;
+
+export const civilDateSchema = z.iso
+  .date()
+  .refine((v) => v >= '0001-01-01', 'Data inválida');
+export const monthSchema = z.string().regex(/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/);
+export const positiveMoneySchema = moneySchema.refine(
+  (v) => !v.startsWith('-') && /[1-9]/.test(v),
+  'O valor deve ser positivo',
+);
+const transactionFields = z
+  .object({
+    description: z.string().trim().min(1).max(500),
+    type: categoryTypeSchema,
+    expectedAmount: positiveMoneySchema.nullable().optional(),
+    amount: positiveMoneySchema.nullable().optional(),
+    transactionDate: civilDateSchema,
+    dueDate: civilDateSchema,
+    accountId: uuidSchema,
+    categoryId: uuidSchema,
+    ownerMemberId: uuidSchema.nullable().optional(),
+    notes: z.string().trim().max(5000).nullable().optional(),
+  })
+  .strict();
+export const createTransactionSchema = transactionFields.refine(
+  (v) => v.expectedAmount != null || v.amount != null,
+  'Informe valor previsto ou realizado',
+);
+export const updateTransactionSchema = transactionFields
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Informe ao menos um campo');
+export const payTransactionSchema = z
+  .object({
+    amount: positiveMoneySchema.optional(),
+    paidAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+export const transactionListSchema = z
+  .object({
+    month: monthSchema.optional(),
+    type: categoryTypeSchema.optional(),
+    status: z.enum(['PENDING', 'PAID', 'OVERDUE', 'CANCELLED']).optional(),
+    accountId: uuidSchema.optional(),
+    categoryId: uuidSchema.optional(),
+    search: z.string().trim().max(200).optional(),
+  })
+  .strict();
+export const transactionSummarySchema = z
+  .object({ month: monthSchema })
+  .strict();
+export type CreateTransaction = z.infer<typeof createTransactionSchema>;
+export type UpdateTransaction = z.infer<typeof updateTransactionSchema>;
+export type PayTransaction = z.infer<typeof payTransactionSchema>;
+export type TransactionQuery = z.infer<typeof transactionListSchema>;

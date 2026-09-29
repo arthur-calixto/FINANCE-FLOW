@@ -153,3 +153,7 @@ pnpm format:check
 `db:test` usa o psql do container PostgreSQL local, sem dependência adicional. Cria fixtures temporárias numa transação e termina com ROLLBACK, inclusive desfazendo sua função auxiliar. Verifica referências entre tenants (inclusive UPDATE), unicidades, referências opcionais, separação de valores previstos/efetivos, datas, precisão decimal, enum sem TRANSFER, proteção contra exclusões em cascata, fronteiras 1/31 e 0/32 para dias, contagens positivas, montantes zero/negativos/NaN, transferências para a mesma conta e Transfer.updatedAt obrigatório. Requer o Compose iniciado e migrations aplicadas; não é executado por `pnpm test`, que continua independente de banco.
 
 A estratégia de FKs segue o [modo foreignKeys do Prisma](https://docs.prisma.io/docs/orm/prisma-schema/data-model/relations/relation-mode); migrations existentes são aplicadas com [Prisma Migrate](https://docs.prisma.io/docs/orm/reference/prisma-cli-reference).
+
+## Aplicação na Task 05
+
+TransactionsService implementa as invariantes de valores, baixa e autoria para lançamentos simples; exige conta e categoria compatíveis do workspace e deriva competência do vencimento. OVERDUE é efetivo na leitura. CategoriesService passa a proteger também o tipo de categorias com lançamentos existentes. Nenhuma migration ou alteração de schema foi necessária. Veja [regras e contratos completos](transactions.md).

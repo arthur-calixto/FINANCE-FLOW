@@ -83,6 +83,17 @@ export class CategoriesService {
           throw new BadRequestException(
             'Altere ou desvincule as subcategorias antes de mudar o tipo.',
           );
+        if (
+          id &&
+          data.type &&
+          data.type !== existing?.type &&
+          (await tx.transaction.findFirst({
+            where: { workspaceId, categoryId: id, type: { not: data.type } },
+          }))
+        )
+          throw new BadRequestException(
+            'Esta categoria possui lançamentos de outro tipo.',
+          );
         return id
           ? tx.category.update({
               where: { workspaceId_id: { workspaceId, id } },

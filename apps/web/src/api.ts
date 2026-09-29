@@ -8,11 +8,11 @@ export class ApiError extends Error {
         : status === 403
           ? 'Você não tem acesso a este workspace.'
           : status === 400
-            ? 'Confira os dados. O responsável ou categoria pai deve pertencer a este workspace; categorias precisam ter o mesmo tipo e não podem formar ciclos.'
+            ? 'Confira valores, datas e vínculos. Selecione conta e categoria válidas deste workspace e de tipo compatível.'
             : status === 404
               ? 'Registro não encontrado neste workspace.'
               : status === 409
-                ? 'Conflito ao salvar. Atualize a página e tente novamente.'
+                ? 'Operação incompatível com o estado atual. Reabra lançamentos pagos antes de editar ou cancelar e atualize a página.'
                 : 'Não foi possível carregar seus dados. Tente novamente.',
     );
   }

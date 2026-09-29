@@ -1,7 +1,7 @@
 # FINANCE FLOW
 
 Fundação de um sistema Web-first de gestão financeira pessoal e familiar.
-O projeto contém a fundação técnica, schema financeiro v1 e autenticação via Supabase com contexto de workspace. A Task 04 adiciona gerenciamento de contas e categorias, sem lançamentos, dashboard financeiro ou aplicativo mobile.
+O projeto contém a fundação técnica, schema financeiro v1 e autenticação via Supabase com contexto de workspace. As Tasks 04–05 adicionam contas, categorias e lançamentos simples de receitas/despesas, com competência por vencimento, baixa e resumo mensal. Não há dashboard financeiro ou aplicativo mobile.
 
 ## Arquitetura
 
@@ -94,3 +94,7 @@ O lockfile deve ser versionado; em CI use `pnpm install --frozen-lockfile`.
 ## Contas e categorias
 
 A área autenticada possui `/app/accounts` e `/app/categories`. Ambas usam o workspace ativo e oferecem criação, edição, desativação e reativação. A API expõe GET/POST nas coleções e GET/PATCH/DELETE nos detalhes, protegidos por JWT e `X-Workspace-Id`. Veja [conceitos, regras, testes e screenshots](docs/accounts-and-categories.md).
+
+## Lançamentos
+
+`/app/transactions` permite criar receitas/despesas, alternar competência, filtrar, editar, pagar/receber, reabrir e cancelar. A API disponibiliza CRUD em `/transactions`, operações `/pay` e `/reopen` e `/transactions/summary?month=YYYY-MM`. Veja [contratos, datas, estados e validação](docs/transactions.md).

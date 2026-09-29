@@ -43,3 +43,41 @@ export interface CategoryRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TransactionStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+export interface TransactionRecord {
+  id: string;
+  workspaceId: string;
+  description: string;
+  type: CategoryType;
+  status: TransactionStatus;
+  expectedAmount: string | null;
+  amount: string | null;
+  transactionDate: string;
+  competenceDate: string;
+  dueDate: string;
+  paidAt: string | null;
+  accountId: string | null;
+  categoryId: string | null;
+  ownerMemberId: string | null;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  account: { id: string; name: string } | null;
+  category: { id: string; name: string } | null;
+}
+export interface TransactionSummary {
+  income: { expected: string; realized: string };
+  expense: { expected: string; realized: string };
+}
+export function brazilToday(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((p) => p.type === type)!.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}

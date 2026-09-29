@@ -738,3 +738,117 @@ dialog::backdrop {
     transition: background-color 0.15s;
   }
 }
+
+.transaction-actions,
+.month-navigation,
+.transaction-heading,
+.transaction-values {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.month-navigation {
+  margin-bottom: 1.5rem;
+}
+.month-navigation .form-field {
+  margin: 0;
+}
+.month-navigation strong {
+  text-transform: capitalize;
+}
+.transaction-filters,
+.monthly-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.monthly-summary .card {
+  padding: 1rem;
+}
+.monthly-summary strong {
+  display: block;
+  font-size: 1.35rem;
+  margin-top: 0.5rem;
+}
+.transactions-list {
+  display: grid;
+  gap: 1rem;
+}
+.transaction-heading {
+  justify-content: space-between;
+}
+.transaction-heading h2 {
+  margin: 0.4rem 0;
+}
+.transaction-values {
+  margin: 1rem 0;
+}
+.transaction-values span {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 150px;
+}
+.transaction-type {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.transaction-type.INCOME {
+  color: #146b52;
+}
+.transaction-type.EXPENSE {
+  color: #99551e;
+}
+.status-OVERDUE {
+  background: #fff0da;
+  color: #8b4300;
+}
+.status-PAID {
+  background: #e5f3e9;
+  color: #126346;
+}
+.status-CANCELLED {
+  background: #eee;
+  color: #555;
+}
+.status-PENDING {
+  background: #edf0ff;
+  color: #494b87;
+}
+.transaction-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+@media (max-width: 1050px) {
+  .transaction-filters,
+  .monthly-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .transaction-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .transaction-actions {
+    width: 100%;
+  }
+  .transaction-actions .button {
+    flex: 1;
+  }
+  .monthly-summary strong {
+    font-size: 1.1rem;
+  }
+  .month-navigation {
+    gap: 0.5rem;
+  }
+  .month-navigation strong {
+    width: 100%;
+  }
+  .transaction-values {
+    gap: 0.75rem;
+  }
+  .transaction-filters .input {
+    min-width: 0;
+  }
+}

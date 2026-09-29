@@ -16,3 +16,7 @@ export const CurrentWorkspace = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext) =>
     ctx.switchToHttp().getRequest<ContextRequest>().workspace,
 );
+export const CurrentUser = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext) =>
+    ctx.switchToHttp().getRequest<ContextRequest>().domainUser,
+);

@@ -15,3 +15,12 @@ export function parseMoneyInput(value: string): string {
     );
   return moneySchema.parse(trimmed.replace(',', '.'));
 }
+export function moneyDifference(actual: string, expected: string) {
+  const cents = (v: string) => {
+    const [whole, fraction = ''] = v.split('.');
+    return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+  };
+  const value = cents(actual) - cents(expected),
+    abs = value < 0n ? -value : value;
+  return `${value < 0n ? '-' : ''}${abs / 100n}.${(abs % 100n).toString().padStart(2, '0')}`;
+}

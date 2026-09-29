@@ -1,3 +1,4 @@
+import { Transactions } from './resources/Transactions';
 import { AppShell, Overview } from './Shell';
 import { Accounts } from './resources/Accounts';
 import { Categories } from './resources/Categories';
@@ -210,6 +211,7 @@ export function AppRoutes() {
         }
       >
         <Route index element={<Overview />} />
+        <Route path="transactions" element={<Transactions />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="categories" element={<Categories />} />
       </Route>

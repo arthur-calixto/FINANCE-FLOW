@@ -56,6 +56,8 @@ test('endpoints protegidos rejeitam ausência de JWT e JWT inválido', async () 
       '/workspaces',
       '/accounts',
       '/categories',
+      '/transactions',
+      '/transactions/summary?month=2026-10',
       `/workspaces/${randomUUID()}`,
     ]) {
       assert.equal((await fetch(base + path)).status, 401);
