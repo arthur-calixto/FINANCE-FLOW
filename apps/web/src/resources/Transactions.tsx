@@ -1,3 +1,4 @@
+import { InstallmentForm } from './InstallmentForm';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -59,6 +60,7 @@ function TransactionDialog({
   saved: () => void;
 }) {
   const row = editor.row;
+  const [installments, setInstallments] = useState(false);
   const [type, setType] = useState<CategoryType>(
     editor.kind === 'edit' ? editor.type : row!.type,
   );
@@ -139,12 +141,37 @@ function TransactionDialog({
       setBusy(false);
     }
   }
+  if (installments && !row && editor.kind === 'edit')
+    return (
+      <InstallmentForm
+        ws={workspaceId}
+        origin="ACCOUNT"
+        initialType={type}
+        accounts={accounts}
+        categories={categories}
+        close={close}
+        saved={saved}
+        single={() => setInstallments(false)}
+      />
+    );
   return (
     <Dialog title={title} onClose={close} busy={busy}>
       <form onSubmit={submit}>
         <fieldset disabled={busy}>
           {editor.kind === 'edit' ? (
             <>
+              {!row && (
+                <FormField label="Pagamento">
+                  <Select
+                    aria-label="Pagamento"
+                    value="SINGLE"
+                    onChange={() => setInstallments(true)}
+                  >
+                    <option value="SINGLE">À vista</option>
+                    <option value="INSTALLMENTS">Parcelado</option>
+                  </Select>
+                </FormField>
+              )}
               <FormField label="Tipo">
                 <Select
                   value={type}
@@ -636,6 +663,15 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
                         </span>
                       )}
                   </div>
+                  {row.installmentGroupId && (
+                    <Link
+                      className="button button-secondary"
+                      to={`/app/installment-groups/${row.installmentGroupId}`}
+                    >
+                      Ver parcelamento {row.installmentNumber}/
+                      {row.installmentGroup?.installmentCount}
+                    </Link>
+                  )}
                   {row.creditCardId && row.invoiceId && (
                     <Link
                       className="button button-secondary"
@@ -657,19 +693,27 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
                           </Button>
                         ) : (
                           <>
-                            <Button
-                              variant="quiet"
-                              onClick={() =>
-                                setEditor({ kind: 'edit', row, type: row.type })
-                              }
-                            >
-                              Editar
-                            </Button>
+                            {!row.installmentGroupId && (
+                              <Button
+                                variant="quiet"
+                                onClick={() =>
+                                  setEditor({
+                                    kind: 'edit',
+                                    row,
+                                    type: row.type,
+                                  })
+                                }
+                              >
+                                Editar
+                              </Button>
+                            )}
                             <Button
                               variant="quiet"
                               onClick={() => setEditor({ kind: 'cancel', row })}
                             >
-                              Cancelar lançamento
+                              {row.installmentGroupId
+                                ? 'Cancelar parcela'
+                                : 'Cancelar lançamento'}
                             </Button>
                             <Button
                               onClick={() => setEditor({ kind: 'pay', row })}

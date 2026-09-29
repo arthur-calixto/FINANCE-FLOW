@@ -58,6 +58,7 @@ test('endpoints protegidos rejeitam ausência de JWT e JWT inválido', async () 
       '/categories',
       '/transactions',
       '/credit-cards',
+      `/installment-groups/${randomUUID()}`,
       '/transactions/summary?month=2026-10',
       `/workspaces/${randomUUID()}`,
     ]) {

@@ -15,3 +15,5 @@ A Task 04 introduz o shell autenticado e os módulos de contas/categorias, reuti
 A Task 05 adiciona TransactionsService e a tela de lançamentos simples. Competência deriva do vencimento, datas civis são preservadas e atraso é calculado na leitura no contexto de São Paulo. Baixas e reaberturas usam transações com bloqueio de linha; relatórios somam NUMERIC no PostgreSQL. Contratos, helper de dia brasileiro e schemas são compartilhados. Veja [lançamentos](transactions.md).
 
 A Task 06 introduz CreditCardsService, calendário central no backend e telas de cartões/faturas. Pagamento integral usa a própria CreditCardInvoice para registrar conta e valor de caixa, mantendo Transactions como única fonte de despesas econômicas. Locks transacionais protegem limite, unicidade e liquidação. Veja [cartões e faturas](credit-cards.md).
+
+A Task 07 reutiliza InstallmentGroup sem migration. InstallmentsService gera planos comuns/cartão atomicamente, reutiliza calendário e locks da FIN-6 e expõe prévias ao frontend. Ver [parcelamentos](installments.md).

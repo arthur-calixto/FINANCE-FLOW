@@ -17,6 +17,7 @@ import { databaseOperation } from './database-errors';
 const date = (v: string) => new Date(`${v}T00:00:00.000Z`);
 const civil = (v: Date) => v.toISOString().slice(0, 10);
 const relations = {
+  installmentGroup: { select: { id: true, installmentCount: true } },
   creditCard: { select: { id: true, name: true } },
   invoice: { select: { id: true, referenceMonth: true } },
   account: { select: { id: true, name: true } },
@@ -25,9 +26,7 @@ const relations = {
 const simple = {
   creditCardId: null,
   invoiceId: null,
-  installmentGroupId: null,
   recurrenceId: null,
-  installmentNumber: null,
 };
 @Injectable()
 export class TransactionsService {
@@ -55,9 +54,7 @@ export class TransactionsService {
     const today = date(brazilToday());
     return {
       workspaceId,
-      installmentGroupId: null,
       recurrenceId: null,
-      installmentNumber: null,
       ...(q.month ? { competenceDate: date(`${q.month}-01`) } : {}),
       ...(q.type ? { type: q.type } : {}),
       ...(q.accountId ? { accountId: q.accountId } : {}),
@@ -88,9 +85,7 @@ export class TransactionsService {
       where: {
         workspaceId,
         id,
-        installmentGroupId: null,
         recurrenceId: null,
-        installmentNumber: null,
       },
       include: relations,
     });
@@ -239,6 +234,10 @@ export class TransactionsService {
   }
   update(workspaceId: string, id: string, data: UpdateTransaction) {
     return this.mutate(workspaceId, id, async (tx, row) => {
+      if (row.installmentGroupId)
+        throw new ConflictException(
+          'Parcelas não podem ser editadas após a geração.',
+        );
       if (row.status === 'PAID' || row.status === 'CANCELLED')
         throw new ConflictException(
           'Reabra o lançamento pago antes de editar. Cancelados não podem ser editados.',

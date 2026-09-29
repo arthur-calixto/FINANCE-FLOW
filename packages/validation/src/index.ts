@@ -214,3 +214,49 @@ export type CreateCreditCard = z.infer<typeof createCreditCardSchema>;
 export type UpdateCreditCard = z.infer<typeof updateCreditCardSchema>;
 export type CreatePurchase = z.infer<typeof createPurchaseSchema>;
 export type PayInvoice = z.infer<typeof payInvoiceSchema>;
+
+export const installmentCountSchema = z.number().int().min(1).max(120);
+const installmentBase = {
+  description: z.string().trim().min(1).max(500),
+  totalAmount: positiveMoneySchema,
+  installmentCount: installmentCountSchema,
+  transactionDate: civilDateSchema,
+  categoryId: uuidSchema,
+  notes: z.string().trim().max(5000).nullable().optional(),
+};
+export const createInstallmentSchema = z
+  .object({
+    ...installmentBase,
+    type: categoryTypeSchema,
+    firstDueDate: civilDateSchema,
+    accountId: uuidSchema,
+  })
+  .strict();
+export const createCardInstallmentSchema = z.object(installmentBase).strict();
+export const installmentPreviewSchema = z
+  .object({
+    totalAmount: positiveMoneySchema,
+    installmentCount: installmentCountSchema,
+    firstDueDate: civilDateSchema,
+  })
+  .strict();
+export const cardInstallmentPreviewSchema = z
+  .object({
+    totalAmount: positiveMoneySchema,
+    installmentCount: installmentCountSchema,
+    transactionDate: civilDateSchema,
+  })
+  .strict();
+export const cancelInstallmentsSchema = z
+  .object({
+    fromInstallmentNumber: installmentCountSchema,
+    scope: z.enum(['ONE', 'FROM']),
+  })
+  .strict();
+export type CreateInstallment = z.infer<typeof createInstallmentSchema>;
+export type CreateCardInstallment = z.infer<typeof createCardInstallmentSchema>;
+export type InstallmentPreviewInput = z.infer<typeof installmentPreviewSchema>;
+export type CardInstallmentPreviewInput = z.infer<
+  typeof cardInstallmentPreviewSchema
+>;
+export type CancelInstallments = z.infer<typeof cancelInstallmentsSchema>;

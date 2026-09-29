@@ -32,7 +32,7 @@ export class CreditCardsService {
     if (!card) throw new NotFoundException('Cartão não encontrado.');
     return card;
   }
-  private async used(
+  async used(
     tx: Prisma.TransactionClient,
     workspaceId: string,
     creditCardId: string,
@@ -112,7 +112,9 @@ export class CreditCardsService {
           },
           orderBy: [{ name: 'asc' }, { id: 'asc' }],
         });
-        return Promise.all(rows.map((r) => this.cardView(tx, r)));
+        const result = [];
+        for (const row of rows) result.push(await this.cardView(tx, row));
+        return result;
       },
       { isolationLevel: 'RepeatableRead' },
     );
@@ -133,7 +135,7 @@ export class CreditCardsService {
       ),
     );
   }
-  private locked<T>(
+  locked<T>(
     workspaceId: string,
     id: string,
     action: (tx: Prisma.TransactionClient, card: CreditCard) => Promise<T>,
@@ -275,7 +277,9 @@ export class CreditCardsService {
           orderBy: { referenceMonth: 'desc' },
           take: 24,
         });
-        return Promise.all(rows.map((r) => this.invoiceView(tx, r)));
+        const result = [];
+        for (const row of rows) result.push(await this.invoiceView(tx, row));
+        return result;
       },
       { isolationLevel: 'RepeatableRead' },
     );

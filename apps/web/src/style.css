@@ -917,3 +917,26 @@ dialog::backdrop {
 .accounts-grid .card-actions {
   flex-wrap: wrap;
 }
+.installment-preview {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f1f6ed;
+  border-radius: 12px;
+}
+.installment-preview ol {
+  list-style: none;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.installment-preview li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #dce5df;
+  flex-wrap: wrap;
+}
+.transactions-list .card-actions {
+  flex-wrap: wrap;
+}

@@ -146,3 +146,7 @@ Também foram verificados histórico/fatura futura, cancelamento de novembro lib
 - [Fatura — celular](screenshots/invoice-mobile.png)
 
 Limitações deliberadas: sem reabertura de fatura, sem edição de compra (cancelar e registrar novamente antes do pagamento) e sem mudança de calendário após a primeira fatura. Bundle Web mantém aviso não bloqueante acima de 500 kB. Não há commit automático.
+
+## Evolução na Task 07
+
+Compras parceladas usam as mesmas faturas, locks, pagamento e cálculo de limite. Todas as parcelas futuras são geradas juntas; cancelamento passa a ser por grupo e somente antes de qualquer parcela paga. A rota de cancelamento de compra simples continua rejeitando parcelas. Veja [parcelamentos](installments.md).

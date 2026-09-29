@@ -1,3 +1,4 @@
+import { InstallmentGroup } from './resources/InstallmentGroup';
 import { CreditCards } from './resources/CreditCards';
 import { CardInvoices } from './resources/CardInvoices';
 import { Transactions } from './resources/Transactions';
@@ -213,6 +214,7 @@ export function AppRoutes() {
         }
       >
         <Route index element={<Overview />} />
+        <Route path="installment-groups/:id" element={<InstallmentGroup />} />
         <Route path="credit-cards" element={<CreditCards />} />
         <Route
           path="credit-cards/:cardId/invoices"

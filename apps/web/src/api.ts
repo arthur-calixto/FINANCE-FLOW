@@ -53,6 +53,9 @@ export async function apiRequest(
   if (!response.ok) {
     const allowed = new Set([
       'A compra ultrapassa o limite disponível.',
+      'O total deve permitir pelo menos R$ 0,01 por parcela.',
+      'Não é possível cancelar compra parcelada com parcelas pagas.',
+      'Selecione uma parcela pendente.',
       'O limite não pode ficar abaixo do valor utilizado.',
       'Dias de virada e vencimento não podem mudar após criar faturas.',
       'Ative o cartão antes de registrar compras.',
@@ -66,7 +69,9 @@ export async function apiRequest(
     ]);
     let message: string | undefined;
     if (
-      path.startsWith('/credit-cards') &&
+      (path.startsWith('/credit-cards') ||
+        path.startsWith('/installments') ||
+        path.startsWith('/installment-groups')) &&
       [400, 409].includes(response.status)
     ) {
       const body = (await response.json().catch(() => null)) as {

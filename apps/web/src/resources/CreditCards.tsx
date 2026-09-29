@@ -1,3 +1,4 @@
+import { InstallmentForm } from './InstallmentForm';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -162,6 +163,7 @@ export function PurchaseForm({
   close: () => void;
   saved: () => void;
 }) {
+  const [installments, setInstallments] = useState(false);
   const [cardId, setCard] = useState(initialCard),
     [day, setDay] = useState(brazilToday()),
     [preview, setPreview] = useState<InvoicePreview | null>(null),
@@ -218,10 +220,33 @@ export function PurchaseForm({
       setBusy(false);
     }
   }
+  if (installments)
+    return (
+      <InstallmentForm
+        ws={ws}
+        origin="CREDIT_CARD"
+        cards={cards}
+        initialCard={cardId}
+        categories={categories.data ?? []}
+        close={close}
+        saved={saved}
+        single={() => setInstallments(false)}
+      />
+    );
   return (
     <Dialog title="Nova compra" onClose={close} busy={busy}>
       <form onSubmit={submit}>
         <fieldset disabled={busy}>
+          <FormField label="Pagamento">
+            <Select
+              aria-label="Pagamento"
+              value="SINGLE"
+              onChange={() => setInstallments(true)}
+            >
+              <option value="SINGLE">À vista</option>
+              <option value="INSTALLMENTS">Parcelado</option>
+            </Select>
+          </FormField>
           <FormField label="Cartão">
             <Select
               aria-label="Cartão"

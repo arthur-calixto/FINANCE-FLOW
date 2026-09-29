@@ -1,3 +1,5 @@
+import { InstallmentsController } from './resources/installments.controller';
+import { InstallmentsService } from './resources/installments.service';
 import { CreditCardsController } from './resources/credit-cards.controller';
 import { CreditCardsService } from './resources/credit-cards.service';
 import { TransactionsController } from './resources/transactions.controller';
@@ -24,6 +26,7 @@ import { IdentityController } from './auth/identity.controller';
     CategoriesController,
     TransactionsController,
     CreditCardsController,
+    InstallmentsController,
   ],
   providers: [
     PrismaService,
@@ -31,6 +34,7 @@ import { IdentityController } from './auth/identity.controller';
     CategoriesService,
     TransactionsService,
     CreditCardsService,
+    InstallmentsService,
     WriteGuard,
     JwtVerifier,
     AuthGuard,

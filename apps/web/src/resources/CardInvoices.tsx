@@ -343,9 +343,17 @@ function InvoiceContent({
               {p.category?.name ?? 'Sem categoria'}
             </p>
             <strong>{formatMoney(p.amount ?? '0.00')}</strong>
+            {p.installmentGroupId && (
+              <p>
+                <Link to={`/app/installment-groups/${p.installmentGroupId}`}>
+                  Ver parcelamento
+                </Link>
+              </p>
+            )}
             {writable &&
               invoice.status !== 'PAID' &&
-              p.status !== 'CANCELLED' && (
+              p.status !== 'CANCELLED' &&
+              !p.installmentGroupId && (
                 <div className="card-actions">
                   <Button
                     variant="quiet"

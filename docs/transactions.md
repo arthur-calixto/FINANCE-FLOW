@@ -19,7 +19,7 @@ Todos os endpoints exigem JWT válido, `X-Workspace-Id` e membership. OWNER, ADM
 
 Filtros: `month=YYYY-MM`, `type`, `status`, `accountId`, `categoryId` e `search` por descrição (sem distinguir maiúsculas). Filtros são combinados por AND. Sem mês, a API lista todos os lançamentos simples do workspace. A Web sempre informa mês, possui filtros de tipo/status/conta/categoria e navegação mensal. Cancelados ficam consultáveis e identificados; não entram nos totais.
 
-Na criação/edição bancária, os campos de cartão, fatura, parcelamento e recorrência não são aceitos. A Task 06 inclui compras simples no cartão nas consultas e no resumo, com indicação e link da fatura. Mutações bancárias não alteram essas compras: baixa ocorre pela fatura, e cancelamento pela rota do cartão. Parcelamentos e recorrências seguem fora destas consultas. Veja [cartões e faturas](credit-cards.md).
+Na criação/edição bancária, os campos de cartão, fatura, parcelamento e recorrência não são aceitos. A Task 06 inclui compras simples no cartão nas consultas e no resumo, com indicação e link da fatura. Mutações bancárias não alteram essas compras: baixa ocorre pela fatura, e cancelamento pela rota do cartão. A Task 07 também inclui parcelas nas consultas/resumo e permite baixa/reabertura/cancelamento de parcelas comuns; PATCH estrutural fica bloqueado. Recorrências continuam fora destas consultas. Veja [cartões e faturas](credit-cards.md).
 
 ## Criação e edição
 
@@ -117,3 +117,5 @@ Desktop (1440 px), tablet (768 px) e celular (390 px) sem erros de console ou ov
 - [Lançamentos — celular](screenshots/transactions-mobile.png)
 
 A suíte mantém os testes anteriores. O build emite o aviso já existente de bundle Web acima de 500 kB; não impede build ou execução.
+
+Parcelas comuns e de cartão são identificadas por installmentGroupId/installmentNumber e descrições “1/N”. Detalhe e regras da FIN-7 em [parcelamentos](installments.md).

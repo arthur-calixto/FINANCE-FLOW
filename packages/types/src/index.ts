@@ -46,6 +46,9 @@ export interface CategoryRecord {
 
 export type TransactionStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 export interface TransactionRecord {
+  installmentGroupId?: string | null;
+  installmentNumber?: number | null;
+  installmentGroup?: { id: string; installmentCount: number } | null;
   creditCardId?: string | null;
   invoiceId?: string | null;
   creditCard?: { id: string; name: string } | null;
@@ -118,4 +121,34 @@ export interface CreditCardRecord {
 export interface InvoiceDetail extends InvoiceRecord {
   creditCard: { id: string; name: string };
   purchases: TransactionRecord[];
+}
+
+export interface InstallmentPlanRow {
+  installmentNumber: number;
+  amount: string;
+  dueDate: string;
+  competenceDate: string;
+  closingDate?: string;
+}
+export interface InstallmentPlan {
+  installmentCount: number;
+  totalAmount: string;
+  installments: InstallmentPlanRow[];
+  availableBefore?: string;
+  availableAfter?: string;
+}
+export interface InstallmentGroupRecord {
+  id: string;
+  workspaceId: string;
+  description: string;
+  totalAmount: string;
+  installmentCount: number;
+  purchaseDate: string;
+  type: CategoryType;
+  origin: 'ACCOUNT' | 'CREDIT_CARD';
+  accountId: string | null;
+  creditCardId: string | null;
+  account: { id: string; name: string } | null;
+  creditCard: { id: string; name: string } | null;
+  installments: TransactionRecord[];
 }
