@@ -54,6 +54,7 @@ export async function apiRequest(
     const allowed = new Set([
       'A compra ultrapassa o limite disponível.',
       'O total deve permitir pelo menos R$ 0,01 por parcela.',
+      'O valor total excede o máximo permitido.',
       'Não é possível cancelar compra parcelada com parcelas pagas.',
       'Selecione uma parcela pendente.',
       'O limite não pode ficar abaixo do valor utilizado.',

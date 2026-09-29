@@ -22,20 +22,62 @@ export function splitInstallments(total: string, count: number): string[] {
     return `${value / 100n}.${String(value % 100n).padStart(2, '0')}`;
   });
 }
+export function installmentTotal(data: {
+  amountMode: 'TOTAL' | 'INSTALLMENT';
+  totalAmount?: string;
+  installmentAmount?: string;
+  installmentCount: number;
+}): string {
+  if (data.amountMode === 'TOTAL') return data.totalAmount!;
+  const amount = splitInstallments(data.installmentAmount!, 1)[0];
+  const total = moneyCents(amount) * BigInt(data.installmentCount);
+  if (total > 9999999999999999999n)
+    throw new BadRequestException('O valor total excede o máximo permitido.');
+  return moneyString(total);
+}
+function moneyCents(value: string): bigint {
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+}
+function moneyString(value: bigint): string {
+  return `${value / 100n}.${String(value % 100n).padStart(2, '0')}`;
+}
+function controlledAmounts(total: string, count: number, start: number) {
+  if (!Number.isInteger(start) || start < 1 || start > count)
+    throw new BadRequestException('Parcela inicial inválida.');
+  return splitInstallments(total, count).slice(start - 1);
+}
+function planSummary(
+  total: string,
+  count: number,
+  start: number,
+  amounts: string[],
+) {
+  return {
+    totalAmount: moneyString(moneyCents(total)),
+    installmentCount: count,
+    startingInstallment: start,
+    previousInstallmentCount: start - 1,
+    controlledInstallmentCount: amounts.length,
+    controlledAmount: moneyString(
+      amounts.reduce((sum, amount) => sum + moneyCents(amount), 0n),
+    ),
+  };
+}
 export function commonInstallmentPlan(
   totalAmount: string,
   count: number,
   firstDueDate: string,
+  startingInstallment = 1,
 ): InstallmentPlan {
-  const amounts = splitInstallments(totalAmount, count),
+  const amounts = controlledAmounts(totalAmount, count, startingInstallment),
     day = Number(firstDueDate.slice(8, 10));
   return {
-    totalAmount,
-    installmentCount: count,
+    ...planSummary(totalAmount, count, startingInstallment, amounts),
     installments: amounts.map((amount, i) => {
       const month = monthOffset(firstDueDate.slice(0, 7), i);
       return {
-        installmentNumber: i + 1,
+        installmentNumber: i + startingInstallment,
         amount,
         dueDate: dayInMonth(month, day),
         competenceDate: month + '-01',
@@ -46,12 +88,17 @@ export function commonInstallmentPlan(
 export function cardInstallmentPlan(
   totalAmount: string,
   count: number,
-  transactionDate: string,
+  transactionDate: string | undefined,
   closingDay: number,
   dueDay: number,
+  startingInstallment = 1,
+  firstInvoiceMonth?: string,
 ): InstallmentPlan {
-  const first = purchaseCalendar(transactionDate, closingDay, dueDay),
-    amounts = splitInstallments(totalAmount, count);
+  const first =
+    startingInstallment === 1
+      ? purchaseCalendar(transactionDate!, closingDay, dueDay)
+      : { referenceMonth: firstInvoiceMonth! + '-01', closingDate: undefined };
+  const amounts = controlledAmounts(totalAmount, count, startingInstallment);
   const installments: InstallmentPlanRow[] = amounts.map((amount, i) => {
     const month = monthOffset(first.referenceMonth.slice(0, 7), i),
       dueDate = dayInMonth(month, dueDay);
@@ -59,12 +106,16 @@ export function cardInstallmentPlan(
     if (closingDate > dueDate)
       closingDate = dayInMonth(monthOffset(month, -1), closingDay);
     return {
-      installmentNumber: i + 1,
+      installmentNumber: i + startingInstallment,
       amount,
       competenceDate: month + '-01',
       dueDate,
-      closingDate: i === 0 ? first.closingDate : closingDate,
+      closingDate:
+        i === 0 && first.closingDate ? first.closingDate : closingDate,
     };
   });
-  return { totalAmount, installmentCount: count, installments };
+  return {
+    ...planSummary(totalAmount, count, startingInstallment, amounts),
+    installments,
+  };
 }

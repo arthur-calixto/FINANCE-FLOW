@@ -130,14 +130,20 @@ export interface InstallmentPlanRow {
   competenceDate: string;
   closingDate?: string;
 }
-export interface InstallmentPlan {
+export interface InstallmentControl {
+  startingInstallment: number;
+  previousInstallmentCount: number;
+  controlledInstallmentCount: number;
+  controlledAmount: string;
+}
+export interface InstallmentPlan extends InstallmentControl {
   installmentCount: number;
   totalAmount: string;
   installments: InstallmentPlanRow[];
   availableBefore?: string;
   availableAfter?: string;
 }
-export interface InstallmentGroupRecord {
+export interface InstallmentGroupRecord extends InstallmentControl {
   id: string;
   workspaceId: string;
   description: string;

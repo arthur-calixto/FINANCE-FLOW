@@ -42,6 +42,8 @@ export function InstallmentForm({
 }) {
   const form = useRef<HTMLFormElement>(null),
     [type, setType] = useState<CategoryType>(initialType),
+    [amountMode, setAmountMode] = useState<'TOTAL' | 'INSTALLMENT'>('TOTAL'),
+    [ongoing, setOngoing] = useState(false),
     [cardId, setCard] = useState(initialCard ?? ''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -49,16 +51,31 @@ export function InstallmentForm({
   const card = origin === 'CREDIT_CARD';
   function values() {
     const v = Object.fromEntries(new FormData(form.current!));
-    return {
-      description: v.description,
-      type: card ? 'EXPENSE' : type,
-      totalAmount: parseMoneyInput(String(v.totalAmount)),
+    const amounts = {
+      amountMode,
+      ...(amountMode === 'TOTAL'
+        ? { totalAmount: parseMoneyInput(String(v.totalAmount)) }
+        : { installmentAmount: parseMoneyInput(String(v.installmentAmount)) }),
       installmentCount: Number(v.installmentCount),
-      transactionDate: v.transactionDate,
-      firstDueDate: v.firstDueDate,
-      accountId: v.accountId,
-      categoryId: v.categoryId,
-      notes: v.notes || null,
+      startingInstallment: ongoing ? Number(v.startingInstallment) : 1,
+    };
+    const dates = card
+      ? ongoing
+        ? { firstInvoiceMonth: v.firstInvoiceMonth }
+        : { transactionDate: v.transactionDate }
+      : { firstDueDate: v.firstDueDate };
+    return {
+      preview: { ...amounts, ...dates },
+      create: {
+        ...amounts,
+        ...dates,
+        description: v.description,
+        ...(!card
+          ? { type, transactionDate: v.transactionDate, accountId: v.accountId }
+          : {}),
+        categoryId: v.categoryId,
+        notes: v.notes || null,
+      },
     };
   }
   async function preview() {
@@ -68,16 +85,8 @@ export function InstallmentForm({
     try {
       const v = values();
       const body = card
-        ? cardInstallmentPreviewSchema.parse({
-            totalAmount: v.totalAmount,
-            installmentCount: v.installmentCount,
-            transactionDate: v.transactionDate,
-          })
-        : installmentPreviewSchema.parse({
-            totalAmount: v.totalAmount,
-            installmentCount: v.installmentCount,
-            firstDueDate: v.firstDueDate,
-          });
+        ? cardInstallmentPreviewSchema.parse(v.preview)
+        : installmentPreviewSchema.parse(v.preview);
       setPlan(
         (await apiRequest(
           card
@@ -92,7 +101,7 @@ export function InstallmentForm({
       setError(
         e instanceof Error && e.name !== 'ZodError'
           ? e.message
-          : 'Informe total positivo, 1 a 120 parcelas e datas válidas.',
+          : 'Informe valor positivo, 1 a 120 parcelas, parcela inicial até o total e datas válidas.',
       );
     } finally {
       setBusy(false);
@@ -106,15 +115,8 @@ export function InstallmentForm({
     try {
       const v = values();
       const body = card
-        ? createCardInstallmentSchema.parse({
-            description: v.description,
-            totalAmount: v.totalAmount,
-            installmentCount: v.installmentCount,
-            transactionDate: v.transactionDate,
-            categoryId: v.categoryId,
-            notes: v.notes,
-          })
-        : createInstallmentSchema.parse(v);
+        ? createCardInstallmentSchema.parse(v.create)
+        : createInstallmentSchema.parse(v.create);
       await apiRequest(
         card ? `/credit-cards/${cardId}/installments` : '/installments',
         ws,
@@ -187,9 +189,44 @@ export function InstallmentForm({
           <FormField label="Descrição">
             <Input name="description" required maxLength={500} autoFocus />
           </FormField>
+          <FormField label="Como deseja informar o parcelamento?">
+            <Select
+              aria-label="Como deseja informar o parcelamento?"
+              value={amountMode}
+              onChange={(e) =>
+                setAmountMode(e.target.value as 'TOTAL' | 'INSTALLMENT')
+              }
+            >
+              <option value="TOTAL">Valor total</option>
+              <option value="INSTALLMENT">Valor da parcela</option>
+            </Select>
+          </FormField>
+          <FormField label="Situação">
+            <Select
+              aria-label="Situação"
+              value={ongoing ? 'ONGOING' : 'NEW'}
+              onChange={(e) => setOngoing(e.target.value === 'ONGOING')}
+            >
+              <option value="NEW">Novo parcelamento</option>
+              <option value="ONGOING">Parcelamento em andamento</option>
+            </Select>
+          </FormField>
           <div className="transaction-form-grid">
-            <FormField label="Valor total (R$)">
-              <Input name="totalAmount" required inputMode="decimal" />
+            <FormField
+              label={
+                amountMode === 'TOTAL'
+                  ? 'Valor total (R$)'
+                  : 'Valor da parcela (R$)'
+              }
+            >
+              <Input
+                key={amountMode}
+                name={
+                  amountMode === 'TOTAL' ? 'totalAmount' : 'installmentAmount'
+                }
+                required
+                inputMode="decimal"
+              />
             </FormField>
             <FormField label="Número de parcelas">
               <Input
@@ -201,16 +238,51 @@ export function InstallmentForm({
                 required
               />
             </FormField>
-            <FormField label={card ? 'Data da compra' : 'Data do lançamento'}>
-              <Input
-                type="date"
-                name="transactionDate"
-                defaultValue={brazilToday()}
-                required
-              />
-            </FormField>
+            {ongoing && (
+              <FormField label="Parcela inicial">
+                <Input
+                  name="startingInstallment"
+                  aria-label="Parcela inicial"
+                  type="number"
+                  min={2}
+                  max={120}
+                  defaultValue={2}
+                  required
+                  aria-describedby="starting-help"
+                />
+                <small id="starting-help">
+                  Informe qual parcela será a primeira controlada pelo FINANCE
+                  FLOW. Use Novo parcelamento para começar em 1.
+                </small>
+              </FormField>
+            )}
+            {card && ongoing ? (
+              <FormField label="Primeira fatura controlada">
+                <Input
+                  name="firstInvoiceMonth"
+                  type="month"
+                  defaultValue={brazilToday().slice(0, 7)}
+                  required
+                />
+              </FormField>
+            ) : (
+              <FormField label={card ? 'Data da compra' : 'Data do lançamento'}>
+                <Input
+                  type="date"
+                  name="transactionDate"
+                  defaultValue={brazilToday()}
+                  required
+                />
+              </FormField>
+            )}
             {!card && (
-              <FormField label="Primeiro vencimento">
+              <FormField
+                label={
+                  ongoing
+                    ? 'Primeiro vencimento controlado'
+                    : 'Primeiro vencimento'
+                }
+              >
                 <Input
                   type="date"
                   name="firstDueDate"
@@ -276,8 +348,19 @@ export function InstallmentForm({
             className="installment-preview"
           >
             <p>
-              {formatMoney(plan.totalAmount)} em {plan.installmentCount}x.
-              Diferença de centavos na última parcela.
+              Valor original: {formatMoney(plan.totalAmount)} em{' '}
+              {plan.installmentCount}x.
+              {amountMode === 'TOTAL'
+                ? ' Diferença de centavos na última parcela.'
+                : ` Parcelas de ${formatMoney(plan.installments[0].amount)}.`}
+            </p>
+            <p>
+              Início do controle: parcela {plan.startingInstallment}/
+              {plan.installmentCount}.<br />
+              Parcelas anteriores: {plan.previousInstallmentCount}. Restam{' '}
+              {plan.controlledInstallmentCount} parcelas.
+              <br />
+              Valor restante controlado: {formatMoney(plan.controlledAmount)}.
             </p>
             {plan.availableBefore !== undefined && (
               <p>

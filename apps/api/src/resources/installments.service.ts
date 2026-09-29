@@ -17,7 +17,11 @@ import { PrismaService } from '../prisma.service';
 import { CreditCardsService } from './credit-cards.service';
 import { databaseOperation } from './database-errors';
 import { asDate, civil } from './card-calendar';
-import { commonInstallmentPlan, cardInstallmentPlan } from './installment-plan';
+import {
+  commonInstallmentPlan,
+  cardInstallmentPlan,
+  installmentTotal,
+} from './installment-plan';
 const Money = Prisma.Decimal.clone({ precision: 40 });
 @Injectable()
 export class InstallmentsService {
@@ -27,9 +31,10 @@ export class InstallmentsService {
   ) {}
   preview(data: InstallmentPreviewInput) {
     return commonInstallmentPlan(
-      data.totalAmount,
+      installmentTotal(data),
       data.installmentCount,
       data.firstDueDate,
+      data.startingInstallment,
     );
   }
   async cardPreview(
@@ -39,17 +44,19 @@ export class InstallmentsService {
   ) {
     const card = await this.cards.get(workspaceId, id);
     const plan = cardInstallmentPlan(
-      data.totalAmount,
+      installmentTotal(data),
       data.installmentCount,
       data.transactionDate,
       card.closingDay,
       card.dueDay,
+      data.startingInstallment,
+      data.firstInvoiceMonth,
     );
     return {
       ...plan,
       availableBefore: card.availableLimit,
       availableAfter: new Money(card.availableLimit)
-        .minus(data.totalAmount)
+        .minus(plan.controlledAmount)
         .toFixed(2),
     };
   }
@@ -88,7 +95,7 @@ export class InstallmentsService {
             workspaceId,
             createdBy,
             description: data.description,
-            totalAmount: data.totalAmount,
+            totalAmount: plan.totalAmount,
             installmentCount: data.installmentCount,
             purchaseDate: asDate(data.transactionDate),
             accountId: data.accountId,
@@ -129,17 +136,19 @@ export class InstallmentsService {
           'Ative o cartão antes de registrar compras.',
         );
       const plan = cardInstallmentPlan(
-        data.totalAmount,
+        installmentTotal(data),
         data.installmentCount,
         data.transactionDate,
         card.closingDay,
         card.dueDay,
+        data.startingInstallment,
+        data.firstInvoiceMonth,
       );
       await this.category(tx, workspaceId, data.categoryId, 'EXPENSE');
       const used = await this.cards.used(tx, workspaceId, id);
       if (
         new Money(used.toString())
-          .plus(data.totalAmount)
+          .plus(plan.controlledAmount)
           .gt(card.creditLimit.toString())
       )
         throw new ConflictException('A compra ultrapassa o limite disponível.');
@@ -148,9 +157,11 @@ export class InstallmentsService {
           workspaceId,
           createdBy,
           description: data.description,
-          totalAmount: data.totalAmount,
+          totalAmount: plan.totalAmount,
           installmentCount: data.installmentCount,
-          purchaseDate: asDate(data.transactionDate),
+          purchaseDate: asDate(
+            data.transactionDate ?? data.firstInvoiceMonth! + '-01',
+          ),
           creditCardId: id,
           categoryId: data.categoryId,
         },
@@ -189,7 +200,9 @@ export class InstallmentsService {
             expectedAmount: p.amount,
             amount: p.amount,
             status: 'PENDING',
-            transactionDate: asDate(data.transactionDate),
+            transactionDate: asDate(
+              data.transactionDate ?? data.firstInvoiceMonth! + '-01',
+            ),
             dueDate: invoice.dueDate,
             competenceDate: invoice.referenceMonth,
             categoryId: data.categoryId,
@@ -230,6 +243,15 @@ export class InstallmentsService {
     return {
       ...record,
       totalAmount: group.totalAmount.toFixed(2),
+      startingInstallment: transactions[0]?.installmentNumber ?? 1,
+      previousInstallmentCount: (transactions[0]?.installmentNumber ?? 1) - 1,
+      controlledInstallmentCount: transactions.length,
+      controlledAmount: transactions
+        .reduce(
+          (sum, row) => sum.plus(row.expectedAmount?.toString() ?? '0'),
+          new Money(0),
+        )
+        .toFixed(2),
       purchaseDate: civil(group.purchaseDate),
       type: transactions[0]?.type ?? 'EXPENSE',
       origin: group.creditCardId ? 'CREDIT_CARD' : 'ACCOUNT',

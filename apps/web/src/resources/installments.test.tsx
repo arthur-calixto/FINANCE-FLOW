@@ -32,6 +32,10 @@ const account = '00000000-0000-4000-8000-000000000001',
   cardId = '00000000-0000-4000-8000-000000000003';
 let rows: TransactionRecord[], group: InstallmentGroupRecord;
 const plan: InstallmentPlan = {
+  startingInstallment: 1,
+  previousInstallmentCount: 0,
+  controlledInstallmentCount: 3,
+  controlledAmount: '1000.00',
   totalAmount: '1000.00',
   installmentCount: 3,
   installments: [
@@ -67,6 +71,10 @@ beforeEach(() => {
   mocks.ws = 'a';
   rows = [];
   group = {
+    startingInstallment: 1,
+    previousInstallmentCount: 0,
+    controlledInstallmentCount: 3,
+    controlledAmount: '1000.00',
     id: 'group',
     workspaceId: 'a',
     description: 'Curso',
@@ -343,5 +351,170 @@ it('erro de preview impede salvar', async () => {
   ).toBe(true);
   expect(
     within(screen.getByRole('dialog')).getByLabelText('Valor total (R$)'),
+  ).toBeTruthy();
+});
+
+it('valor da parcela envia apenas o valor individual e invalida a prévia ao trocar de modo', async () => {
+  const original = mocks.request.getMockImplementation()!;
+  mocks.request.mockImplementation((...args: unknown[]) =>
+    args[0] === '/installments/preview'
+      ? Promise.resolve({
+          ...plan,
+          totalAmount: '999.99',
+          controlledAmount: '999.99',
+          installments: plan.installments.map((p) => ({
+            ...p,
+            amount: '333.33',
+          })),
+        })
+      : original(...args),
+  );
+  render(app());
+  const user = await fillCommon();
+  await user.selectOptions(
+    screen.getByLabelText('Como deseja informar o parcelamento?'),
+    'INSTALLMENT',
+  );
+  expect(screen.queryByLabelText('Valor total (R$)')).toBeNull();
+  await user.type(screen.getByLabelText('Valor da parcela (R$)'), '333,33');
+  await user.click(
+    screen.getByRole('button', { name: 'Pré-visualizar parcelas' }),
+  );
+  const preview = await screen.findByLabelText('Prévia do parcelamento');
+  expect(within(preview).getByText(/Valor original:.*999,99/)).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Salvar parcelamento' }));
+  await screen.findByRole('heading', { name: 'Curso 1/3' });
+  const body = mocks.request.mock.calls.find(
+    (c) => c[0] === '/installments',
+  )?.[3].body;
+  expect(body.amountMode).toBe('INSTALLMENT');
+  expect(body.installmentAmount).toBe('333.33');
+  expect(body.totalAmount).toBeUndefined();
+  expect(body.startingInstallment).toBe(1);
+});
+it('cartão em andamento pede fatura e mantém numeração original, sem data de compra', async () => {
+  const original = mocks.request.getMockImplementation()!;
+  mocks.request.mockImplementation((...args: unknown[]) =>
+    String(args[0]).endsWith('/installments/preview')
+      ? Promise.resolve({
+          ...plan,
+          totalAmount: '3000.00',
+          installmentCount: 10,
+          startingInstallment: 5,
+          previousInstallmentCount: 4,
+          controlledInstallmentCount: 6,
+          controlledAmount: '1800.00',
+          availableBefore: '5000.00',
+          availableAfter: '3200.00',
+          installments: Array.from({ length: 6 }, (_, i) => ({
+            installmentNumber: i + 5,
+            amount: '300.00',
+            dueDate: '2026-10-10',
+            competenceDate: '2026-10-01',
+          })),
+        })
+      : original(...args),
+  );
+  render(app('/app/credit-cards'));
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Nova compra' }));
+  await user.selectOptions(screen.getByLabelText('Pagamento'), 'INSTALLMENTS');
+  await user.type(screen.getByLabelText('Descrição'), 'Notebook');
+  await user.selectOptions(
+    screen.getByLabelText('Como deseja informar o parcelamento?'),
+    'INSTALLMENT',
+  );
+  await user.type(screen.getByLabelText('Valor da parcela (R$)'), '300');
+  fireEvent.change(screen.getByLabelText('Número de parcelas'), {
+    target: { value: '10' },
+  });
+  await user.selectOptions(screen.getByLabelText('Situação'), 'ONGOING');
+  expect(screen.queryByLabelText('Data da compra')).toBeNull();
+  fireEvent.change(screen.getByLabelText('Parcela inicial'), {
+    target: { value: '5' },
+  });
+  fireEvent.change(screen.getByLabelText('Primeira fatura controlada'), {
+    target: { value: '2026-10' },
+  });
+  await user.selectOptions(screen.getByLabelText('Categoria'), category);
+  await user.click(
+    screen.getByRole('button', { name: 'Pré-visualizar parcelas' }),
+  );
+  await screen.findByText('5/10');
+  expect(screen.getByText('10/10')).toBeTruthy();
+  expect(screen.queryByText('1/10')).toBeNull();
+  expect(screen.getByText(/Valor restante controlado:.*1.800,00/)).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Salvar parcelamento' }));
+  await screen.findByText('Compra registrada na fatura.');
+  const body = mocks.request.mock.calls.find(
+    (c) => c[0] === `/credit-cards/${cardId}/installments`,
+  )?.[3].body;
+  expect(body).toMatchObject({
+    amountMode: 'INSTALLMENT',
+    installmentAmount: '300',
+    installmentCount: 10,
+    startingInstallment: 5,
+    firstInvoiceMonth: '2026-10',
+  });
+  expect(body.transactionDate).toBeUndefined();
+  expect(body.totalAmount).toBeUndefined();
+});
+it('parcela inicial fora do total é rejeitada; mudanças de situação descartam a prévia', async () => {
+  render(app());
+  const user = await fillCommon();
+  await user.selectOptions(screen.getByLabelText('Situação'), 'ONGOING');
+  fireEvent.change(screen.getByLabelText('Parcela inicial'), {
+    target: { value: '4' },
+  });
+  await user.click(
+    screen.getByRole('button', { name: 'Pré-visualizar parcelas' }),
+  );
+  await screen.findByRole('alert');
+  expect(
+    mocks.request.mock.calls.some((c) => c[0] === '/installments/preview'),
+  ).toBe(false);
+  fireEvent.change(screen.getByLabelText('Parcela inicial'), {
+    target: { value: '3' },
+  });
+  await user.click(
+    screen.getByRole('button', { name: 'Pré-visualizar parcelas' }),
+  );
+  await screen.findByLabelText('Prévia do parcelamento');
+  expect(
+    mocks.request.mock.calls.find((c) => c[0] === '/installments/preview')?.[3]
+      .body,
+  ).toMatchObject({
+    amountMode: 'TOTAL',
+    startingInstallment: 3,
+    totalAmount: '1000.00',
+  });
+  await user.selectOptions(screen.getByLabelText('Situação'), 'NEW');
+  expect(screen.queryByLabelText('Prévia do parcelamento')).toBeNull();
+  expect(screen.queryByLabelText('Parcela inicial')).toBeNull();
+  await user.click(
+    screen.getByRole('button', { name: 'Pré-visualizar parcelas' }),
+  );
+  await screen.findByLabelText('Prévia do parcelamento');
+  await user.selectOptions(
+    screen.getByLabelText('Como deseja informar o parcelamento?'),
+    'INSTALLMENT',
+  );
+  expect(screen.queryByLabelText('Prévia do parcelamento')).toBeNull();
+});
+it('detalhe retroativo distingue valor original e controlado mesmo após cancelamento', async () => {
+  group.startingInstallment = 3;
+  group.previousInstallmentCount = 2;
+  group.controlledInstallmentCount = 1;
+  group.controlledAmount = '333.34';
+  group.installments = [group.installments[2]];
+  group.installments[0].status = 'CANCELLED';
+  render(app('/app/installment-groups/group'));
+  await screen.findByRole('heading', { name: 'Curso 3/3' });
+  expect(screen.queryByRole('heading', { name: 'Curso 1/3' })).toBeNull();
+  expect(
+    screen.getByText(/Valor controlado inicialmente:.*333,34/),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(/Parcelas anteriores ao FINANCE FLOW: 2/),
   ).toBeTruthy();
 });

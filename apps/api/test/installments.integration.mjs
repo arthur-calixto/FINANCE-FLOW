@@ -434,6 +434,311 @@ test('Parcelamentos: atomicidade, soma, faturas, limite e isolamento', async (t)
         );
       },
     );
+    await t.test(
+      'valor individual e retroativo comum preservam plano e histórico',
+      async () => {
+        for (const [amount, count, total] of [
+          ['100', 5, '500.00'],
+          ['333.33', 3, '999.99'],
+        ]) {
+          const g = await call('/installments', {
+            method: 'POST',
+            expected: 201,
+            body: common({
+              amountMode: 'INSTALLMENT',
+              totalAmount: undefined,
+              installmentAmount: amount,
+              installmentCount: count,
+              firstDueDate: '2035-10-10',
+            }),
+          });
+          assert.equal(g.totalAmount, total);
+          assert.equal(g.controlledAmount, total);
+          assert.equal(g.startingInstallment, 1);
+          assert.ok(
+            g.installments.every(
+              (p) => p.expectedAmount === Number(amount).toFixed(2),
+            ),
+          );
+        }
+        const g = await call('/installments', {
+          method: 'POST',
+          expected: 201,
+          body: common({
+            amountMode: 'INSTALLMENT',
+            totalAmount: undefined,
+            installmentAmount: '500',
+            installmentCount: 12,
+            startingInstallment: 7,
+            firstDueDate: '2036-10-15',
+          }),
+        });
+        assert.equal(g.totalAmount, '6000.00');
+        assert.equal(g.controlledAmount, '3000.00');
+        assert.equal(g.previousInstallmentCount, 6);
+        assert.equal(g.controlledInstallmentCount, 6);
+        assert.deepEqual(
+          g.installments.map((p) => p.installmentNumber),
+          [7, 8, 9, 10, 11, 12],
+        );
+        assert.equal(g.installments[0].dueDate, '2036-10-15');
+        assert.equal(g.installments[5].dueDate, '2037-03-15');
+        assert.equal(
+          (await call('/transactions/summary?month=2036-09')).expense.expected,
+          '0.00',
+        );
+        assert.equal(
+          (await call('/transactions/summary?month=2036-10')).expense.expected,
+          '500.00',
+        );
+        await call('/transactions/' + g.installments[1].id + '/pay', {
+          method: 'POST',
+          body: { amount: '499', paidAt: '2036-11-15T12:00:00Z' },
+        });
+        await call('/installment-groups/' + g.id + '/cancel', {
+          method: 'POST',
+          expected: 400,
+          body: { scope: 'FROM', fromInstallmentNumber: 1 },
+        });
+        const cancelled = await call(
+          '/installment-groups/' + g.id + '/cancel',
+          { method: 'POST', body: { scope: 'FROM', fromInstallmentNumber: 7 } },
+        );
+        assert.equal(cancelled.controlledAmount, '3000.00');
+        assert.equal(cancelled.startingInstallment, 7);
+        assert.deepEqual(
+          cancelled.installments.map((p) => p.status),
+          [
+            'CANCELLED',
+            'PAID',
+            'CANCELLED',
+            'CANCELLED',
+            'CANCELLED',
+            'CANCELLED',
+          ],
+        );
+        const residual = await call('/installments', {
+          method: 'POST',
+          expected: 201,
+          body: common({
+            amountMode: 'TOTAL',
+            totalAmount: '100',
+            startingInstallment: 3,
+            firstDueDate: '2038-10-10',
+          }),
+        });
+        assert.equal(residual.installments.length, 1);
+        assert.equal(residual.installments[0].installmentNumber, 3);
+        assert.equal(residual.installments[0].expectedAmount, '33.34');
+        assert.equal(residual.totalAmount, '100.00');
+        assert.equal(residual.controlledAmount, '33.34');
+        const income = await call('/categories', {
+          method: 'POST',
+          expected: 201,
+          body: { name: 'Receita retroativa', type: 'INCOME' },
+        });
+        const revenue = await call('/installments', {
+          method: 'POST',
+          expected: 201,
+          body: common({
+            type: 'INCOME',
+            categoryId: income.id,
+            startingInstallment: 3,
+            firstDueDate: '2038-10-10',
+          }),
+        });
+        assert.equal(revenue.type, 'INCOME');
+        assert.equal(revenue.installments.length, 1);
+        for (const patch of [
+          { startingInstallment: 4 },
+          { amountMode: 'INSTALLMENT', installmentAmount: '10' },
+          {
+            amountMode: 'INSTALLMENT',
+            totalAmount: undefined,
+            installmentAmount: '99999999999999999.99',
+          },
+          { startingInstallment: 2, accountId: accounts[1].id },
+          { startingInstallment: 2, categoryId: categories[1].id },
+        ])
+          await call('/installments', {
+            method: 'POST',
+            expected: 400,
+            body: common(patch),
+          });
+        await call('/installment-groups/' + g.id, { who: 1, expected: 404 });
+        await call('/transactions/' + g.installments[0].id, {
+          who: 1,
+          expected: 404,
+        });
+      },
+    );
+    await t.test(
+      'cartão em andamento cria somente faturas controladas e libera limite normalmente',
+      async () => {
+        const retroCard = await call('/credit-cards', {
+          method: 'POST',
+          expected: 201,
+          body: {
+            name: 'Retroativo',
+            creditLimit: '2000',
+            closingDay: 25,
+            dueDay: 10,
+          },
+        });
+        const path = '/credit-cards/' + retroCard.id;
+        const payload = {
+          description: 'Notebook retroativo',
+          amountMode: 'INSTALLMENT',
+          installmentAmount: '300',
+          installmentCount: 10,
+          startingInstallment: 5,
+          firstInvoiceMonth: '2032-10',
+          categoryId: categories[0].id,
+        };
+        const preview = await call(path + '/installments/preview', {
+          method: 'POST',
+          body: {
+            amountMode: payload.amountMode,
+            installmentAmount: payload.installmentAmount,
+            installmentCount: 10,
+            startingInstallment: 5,
+            firstInvoiceMonth: '2032-10',
+          },
+        });
+        assert.equal(preview.totalAmount, '3000.00');
+        assert.equal(preview.controlledAmount, '1800.00');
+        assert.equal(preview.availableAfter, '200.00');
+        const g = await call(path + '/installments', {
+          method: 'POST',
+          expected: 201,
+          body: payload,
+        });
+        assert.equal(g.totalAmount, '3000.00');
+        assert.equal(g.controlledAmount, '1800.00');
+        assert.equal(g.purchaseDate, '2032-10-01');
+        assert.deepEqual(
+          g.installments.map((p) => p.installmentNumber),
+          [5, 6, 7, 8, 9, 10],
+        );
+        assert.deepEqual(
+          g.installments.map((p) => p.competenceDate),
+          [
+            '2032-10-01',
+            '2032-11-01',
+            '2032-12-01',
+            '2033-01-01',
+            '2033-02-01',
+            '2033-03-01',
+          ],
+        );
+        assert.equal(
+          await db.transaction.count({ where: { installmentGroupId: g.id } }),
+          6,
+        );
+        assert.equal(
+          await db.creditCardInvoice.count({
+            where: { creditCardId: retroCard.id },
+          }),
+          6,
+        );
+        assert.equal((await call(path)).usedLimit, '1800.00');
+        assert.equal(
+          (await call('/transactions/summary?month=2032-09')).expense.expected,
+          '0.00',
+        );
+        assert.equal(
+          (await call('/transactions/summary?month=2032-10')).expense.expected,
+          '300.00',
+        );
+        const reuse = await call(path + '/installments', {
+          method: 'POST',
+          expected: 201,
+          body: {
+            ...payload,
+            installmentAmount: '100',
+            startingInstallment: 10,
+            transactionDate: '2000-01-01',
+          },
+        });
+        assert.equal(reuse.installments.length, 1);
+        assert.equal(
+          reuse.installments[0].invoiceId,
+          g.installments[0].invoiceId,
+        );
+        await call('/installment-groups/' + reuse.id, { method: 'DELETE' });
+        const meta = await call('/installment-groups/' + reuse.id);
+        assert.equal(meta.controlledAmount, '100.00');
+        assert.equal(meta.startingInstallment, 10);
+        await call(path + '/installments', {
+          method: 'POST',
+          expected: 409,
+          body: payload,
+        });
+        await call(path + '/invoices/' + g.installments[0].invoiceId + '/pay', {
+          method: 'POST',
+          body: { accountId: accounts[0].id, paidAt: '2032-10-10T12:00:00Z' },
+        });
+        assert.equal((await call(path)).usedLimit, '1500.00');
+        assert.equal(
+          (await call('/transactions/summary?month=2032-10')).expense.realized,
+          '300.00',
+        );
+        await call('/installment-groups/' + g.id, {
+          method: 'DELETE',
+          expected: 409,
+        });
+        // Falha na segunda fatura paga desfaz a fatura nova da primeira posição.
+        await call(path + '/installments', {
+          method: 'POST',
+          expected: 409,
+          body: {
+            ...payload,
+            installmentAmount: '1',
+            firstInvoiceMonth: '2032-09',
+          },
+        });
+        assert.equal(
+          await db.creditCardInvoice.count({
+            where: { creditCardId: retroCard.id },
+          }),
+          6,
+        );
+        for (const patch of [
+          { firstInvoiceMonth: undefined },
+          { firstInvoiceMonth: '2032-13' },
+          { startingInstallment: 11 },
+          { startingInstallment: 1 },
+          { totalAmount: '3000' },
+          { categoryId: categories[1].id },
+        ])
+          await call(path + '/installments', {
+            method: 'POST',
+            expected: 400,
+            body: { ...payload, ...patch },
+          });
+        await call('/credit-cards/' + cards[1].id + '/installments', {
+          method: 'POST',
+          expected: 404,
+          body: payload,
+        });
+        await call(path + '/installments/preview', {
+          who: 1,
+          method: 'POST',
+          expected: 404,
+          body: {
+            amountMode: 'INSTALLMENT',
+            installmentAmount: '300',
+            installmentCount: 10,
+            startingInstallment: 5,
+            firstInvoiceMonth: '2032-10',
+          },
+        });
+        await call(path + '/invoices/' + g.installments[0].invoiceId, {
+          who: 1,
+          expected: 404,
+        });
+      },
+    );
     await t.test('cross-tenant, papéis e proteção de vínculos', async () => {
       await call('/installment-groups/' + group.id, { who: 1, expected: 404 });
       await call('/installment-groups/' + group.id + '/cancel', {

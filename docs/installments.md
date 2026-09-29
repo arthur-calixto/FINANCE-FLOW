@@ -1,6 +1,6 @@
 # Parcelamentos — Task 07
 
-Parcelamentos comuns (INCOME ou EXPENSE) e compras parceladas no cartão usam o InstallmentGroup existente. Uma criação gera exatamente N Transactions, numeradas de 1 a N. O grupo guarda valor total, quantidade, descrição, data original e vínculos; o tipo é obtido das parcelas imutáveis. Não houve alteração de schema ou migration.
+Parcelamentos comuns (INCOME ou EXPENSE) e compras parceladas no cartão usam o InstallmentGroup existente. Um novo parcelamento gera N Transactions, numeradas de 1 a N. Um parcelamento em andamento gera somente startingInstallment..N, preservando a numeração original. O grupo guarda valor total, quantidade, descrição, data original e vínculos; o tipo é obtido das parcelas imutáveis. Não houve alteração de schema ou migration.
 
 Não são recorrências: todo grupo tem começo e fim definidos. Não há juros, antecipação, refund, chargeback, renegociação ou parcelamento de fatura.
 
@@ -34,7 +34,7 @@ Exemplo comum:
 }
 ```
 
-No cartão, omitir type, accountId e firstDueDate. Informar description, totalAmount, installmentCount, transactionDate, categoryId e notes opcional. O cartão vem da rota; faturas/competências vêm do backend. Campos desconhecidos ou protegidos são rejeitados.
+No cartão, omitir type, accountId e firstDueDate. No retroativo, informar firstInvoiceMonth (YYYY-MM); transactionDate é opcional/histórica. Informar description, totalAmount, installmentCount, transactionDate, categoryId e notes opcional. O cartão vem da rota; faturas/competências vêm do backend. Campos desconhecidos ou protegidos são rejeitados.
 
 ## Divisão exata
 
@@ -45,13 +45,13 @@ No cartão, omitir type, accountId e firstDueDate. Informar description, totalAm
 3. `restante = totalCentavos % N`.
 4. As primeiras N−1 parcelas recebem base; a última recebe base + restante.
 
-Exemplos: 100/3 → 33.33, 33.33, 33.34; 10/6 → cinco parcelas de 1.66 e uma de 1.70; 0.01/1 → 0.01. Se totalCentavos < N, rejeitar: não há parcelas de valor zero. Soma dos valores previstos gerados é exatamente totalAmount, inclusive na faixa máxima de Decimal(19,2).
+Exemplos: 100/3 → 33.33, 33.33, 33.34; 10/6 → cinco parcelas de 1.66 e uma de 1.70; 0.01/1 → 0.01. Se totalCentavos < N, rejeitar: não há parcelas de valor zero. A soma do plano original é exatamente totalAmount, inclusive na faixa máxima de Decimal(19,2). No retroativo, dividir primeiro o plano original e só então selecionar as parcelas controladas; sua soma é controlledAmount.
 
 expectedAmount de cada parcela preserva o plano original. No comum, amount começa null e pode diferir na baixa, conforme FIN-5; isso não altera o total contratado nem a soma prevista. No cartão, expectedAmount e amount começam iguais à parcela, conforme FIN-6. Cancelamento mantém os valores e a história; os totais ativos deixam de contar as parcelas canceladas, enquanto totalAmount continua registrando o contrato original.
 
 ## Datas comuns
 
-A primeira parcela usa firstDueDate. Todas as seguintes calculam o mês a partir do **mês original mais o índice**, mantendo o dia-base original e limitando-o ao último dia válido. Não se usa a data já ajustada de fevereiro como base para março.
+A primeira parcela **controlada** usa firstDueDate, mesmo quando seu número original é maior que 1. Todas as seguintes calculam o mês a partir do **mês original mais o índice**, mantendo o dia-base original e limitando-o ao último dia válido. Não se usa a data já ajustada de fevereiro como base para março.
 
 31/01/2027 → 28/02/2027 → 31/03/2027 → 30/04/2027. Em 2028, fevereiro recebe 29. Competência é o primeiro dia do mês do vencimento; transactionDate permanece a data original em todas as parcelas. Datas civis são strings YYYY-MM-DD, sem deslocamento de timezone.
 
@@ -59,7 +59,7 @@ Conta deve estar ativa no workspace e categoria ativa/compatível com INCOME ou 
 
 ## Cartão e faturas
 
-A primeira competência é determinada por `purchaseCalendar` da FIN-6. Cada parcela seguinte avança exatamente um mês de competência, **sem simular uma nova compra**. O vencimento usa dueDay original ajustado ao mês; a virada da fatura corresponde à ocorrência de closingDay imediatamente anterior ou igual ao vencimento. Faturas existentes preservam suas datas persistidas.
+Em novos parcelamentos (startingInstallment = 1), a primeira competência é determinada por `purchaseCalendar` da FIN-6. No retroativo, firstInvoiceMonth define explicitamente a primeira competência controlada, sem inferência pela data histórica. Cada parcela seguinte avança exatamente um mês de competência, **sem simular uma nova compra**. O vencimento usa dueDay original ajustado ao mês; a virada da fatura corresponde à ocorrência de closingDay imediatamente anterior ou igual ao vencimento. Faturas existentes preservam suas datas persistidas.
 
 Virada 25, vencimento 10, compra 29/09/2026: primeira parcela em novembro/2026, segunda em dezembro, terceira em janeiro/2027. Dez parcelas terminam em agosto/2027. O calendário continua seguindo o esclarecimento aprovado na FIN-6 sobre dezembro e meses curtos.
 
@@ -69,7 +69,7 @@ Fatura já paga em qualquer posição bloqueia **toda a criação**, com rollbac
 
 ## Limite e pagamento
 
-Validar disponível >= totalAmount sob o mesmo lock de cartão da FIN-6, antes de gerar parcelas. Como todas as Transactions já existem em faturas futuras, a soma de compras não canceladas em faturas não pagas compromete o valor total imediatamente.
+Validar disponível >= controlledAmount sob o mesmo lock de cartão da FIN-6, antes de gerar parcelas. Em um grupo novo, controlledAmount = totalAmount; no retroativo, só o valor materializado compromete o limite. Como todas as Transactions já existem em faturas futuras, a soma de compras não canceladas em faturas não pagas compromete o valor total imediatamente.
 
 R$1.000 em 10x num cartão de R$5.000: utilizado1000/disponível4000. Pagar a primeira fatura realiza só sua parcela de100; utilizado900/disponível4100. As demais permanecem PENDING. Cada mês recebe somente sua parcela no resumo, nunca o total do grupo.
 
@@ -95,7 +95,7 @@ Nenhuma edição de grupo após criação. PATCH de Transaction parcelada també
 
 ## Atomicidade, concorrência e retry
 
-Criações são transações Prisma/PostgreSQL: grupo e N parcelas (mais faturas, no cartão) ou nada. Unicidade `(installmentGroupId, installmentNumber)` protege a numeração; o serviço sempre gera 1..installmentCount.
+Criações são transações Prisma/PostgreSQL: grupo e todas as parcelas controladas (mais faturas, no cartão) ou nada. Unicidade `(installmentGroupId, installmentNumber)` protege a numeração; o serviço gera startingInstallment..installmentCount.
 
 Mutações usam o lock consultivo de categoria/workspace; compras e cancelamentos de cartão também usam o lock da linha CreditCard compartilhado com FIN-6. Isso serializa limite, baixa de fatura e cancelamento completo. Pagamentos comuns e cancelamentos futuros compartilham o lock de workspace, impedindo que uma parcela paga seja cancelada em corrida. Conta é validada sob FOR SHARE. Consultas de grupo usam snapshot RepeatableRead. Leituras de várias faturas na mesma transação agora são sequenciais, evitando chamadas paralelas na mesma conexão do driver PostgreSQL.
 
@@ -140,3 +140,87 @@ Capturas:
 - [Cartão — celular](screenshots/installments-card-mobile.png)
 
 Avisos não bloqueantes: bundle Web acima de 500 kB e depreciação do `pg` sobre consultas simultâneas na mesma conexão. O rastreamento aponta chamadas via `@prisma/adapter-pg`/runtime Prisma; a suíte PostgreSQL passa integralmente, mas a compatibilidade deve ser revista antes de atualizar para pg 9. Não houve commit automático. FIN-8/FIN-9 não foram implementadas ou alteradas.
+
+## Complemento FIN-7 — valor individual e controle retroativo
+
+Os mesmos endpoints aceitam dois modos; strings monetárias continuam preferidas:
+
+- `amountMode: "TOTAL"`: exige `totalAmount`, proíbe `installmentAmount`. O valor é o total **original**, não o restante. Mantém divisão em centavos e resíduo na última parcela original.
+- `amountMode: "INSTALLMENT"`: exige `installmentAmount`, proíbe `totalAmount`. O backend multiplica centavos BigInt pela quantidade original. Como o produto é divisível pela quantidade, todas as parcelas ficam exatamente iguais, sem ajuste residual. 333.33 × 3 = 999.99, nunca 1000.00. Produto acima de Decimal(19,2) é rejeitado antes da gravação.
+- Ausência de `amountMode` equivale a TOTAL, preservando clientes anteriores. `startingInstallment` tem padrão 1; deve ser inteiro entre 1 e installmentCount, que permanece entre 1 e 120.
+- Payload com ambos os valores, valor ausente no modo escolhido, campos desconhecidos, zero/negativo ou frações de centavo é rejeitado.
+
+Exemplo comum (POST /installments):
+
+```json
+{
+  "description": "Empréstimo pessoal",
+  "type": "EXPENSE",
+  "amountMode": "INSTALLMENT",
+  "installmentAmount": "500.00",
+  "installmentCount": 12,
+  "startingInstallment": 7,
+  "transactionDate": "2026-09-29",
+  "firstDueDate": "2026-10-15",
+  "accountId": "UUID",
+  "categoryId": "UUID"
+}
+```
+
+Gera somente 7/12 em 15/10/2026 até 12/12 em 15/03/2027. `firstDueDate` é o primeiro vencimento **controlado**; não avança seis meses por começar em 7. O dia-base continua preservado em meses curtos. A prévia comum recebe apenas os campos de valor, quantidade, startingInstallment e firstDueDate.
+
+Exemplo cartão (POST /credit-cards/:id/installments):
+
+```json
+{
+  "description": "Notebook",
+  "amountMode": "INSTALLMENT",
+  "installmentAmount": "300.00",
+  "installmentCount": 10,
+  "startingInstallment": 5,
+  "firstInvoiceMonth": "2026-10",
+  "categoryId": "UUID"
+}
+```
+
+Gera 5/10 em outubro/2026 até 10/10 em março/2027. A prévia do cartão recebe os campos de valor, quantidade, startingInstallment e firstInvoiceMonth (ou transactionDate no novo). Para startingInstallment = 1, transactionDate é obrigatória e firstInvoiceMonth é proibida; usa o calendário FIN-6. Para startingInstallment > 1, firstInvoiceMonth é obrigatória e transactionDate opcional não influencia a fatura. A UI não pede data de compra no retroativo.
+
+**Data técnica no retroativo do cartão:** como purchaseDate e transactionDate existentes são obrigatórios no schema, quando a API não recebe data histórica, usa o primeiro dia de firstInvoiceMonth. Essa data representa o início do controle, não uma inferência da compra original. Se a data histórica for fornecida, será preservada. Competência, vencimento e limite não dependem desse preenchimento.
+
+Não há migration, reset nem campos redundantes. `InstallmentGroup.totalAmount` e `installmentCount` guardam total e quantidade originais. A criação atômica garante uma sequência contínua startingInstallment..installmentCount. Como parcelas não são excluídas fisicamente e expectedAmount/numeração não são editáveis, o detalhe deriva com segurança:
+
+| Campo                      | Significado                                                |
+| -------------------------- | ---------------------------------------------------------- |
+| totalAmount                | Valor original, incluindo parcelas anteriores ao controle  |
+| installmentCount           | Quantidade original                                        |
+| startingInstallment        | Menor installmentNumber persistido                         |
+| previousInstallmentCount   | startingInstallment − 1                                    |
+| controlledInstallmentCount | Quantidade materializada, incluindo pagas/canceladas       |
+| controlledAmount           | Soma de expectedAmount de todas as parcelas materializadas |
+
+A prévia retorna os mesmos campos calculados do plano. `controlledAmount` é o **valor controlado inicialmente**, não um saldo dinâmico em aberto: não diminui com baixas, diferenças de valor realizado ou cancelamentos. O detalhe usa esse rótulo explicitamente. O modo de entrada não precisa ser persistido: o plano e os valores originais estão preservados.
+
+Parcelas anteriores não existem no banco, não são tratadas como pagas, não entram no resumo, não geram faturas e não participam de cancelamento. Upsert cria/reutiliza somente as competências materializadas. Pagamento, status, cancelamento, resumo e isolamento seguem as regras anteriores sem exceções. Fatura controlada já paga continua bloqueando a criação inteira com rollback.
+
+No exemplo de cartão, original R$3.000 e controlado R$1.800: somente R$1.800 compromete limite. Um cartão com R$2.000 disponível aceita a operação. Após pagar a primeira fatura de R$300, o compromisso cai para R$1.500. Não há reconstrução do limite histórico.
+
+No modo TOTAL, 100/3 iniciado em 3 gera somente 3/3 de 33.34. Não se divide 100 novamente pela quantidade restante. No modo INSTALLMENT, 10×300 iniciado em 5 gera seis parcelas de 300 com numeração 5–10.
+
+### Validação do complemento
+
+Cobertura adicionada: contratos ambíguos/ausentes, limites de numeração e overflow monetário, multiplicação individual exata, resíduo retroativo, calendário manual e histórico independente, ausência de parcelas/faturas anteriores, reutilização de fatura, resumo apenas materializado, baixa e cancelamento com metadados preservados, rollback em fatura paga e isolamento por workspace. A interface cobre modos, campos condicionais, prévia inválida após mudanças, payloads, numeração original e detalhe após cancelamento.
+
+Os três cenários foram executados via Chromium com API/PostgreSQL reais e JWT/JWKS simulado:
+
+- A: valor individual 100, quantidade 5, novo → cinco parcelas de 100, original/controlado 500.
+- B: Notebook 10×300, início 5, primeira fatura outubro/2026 → original 3000, quatro anteriores, seis controladas, valor 1800, numeração 5–10 e faturas outubro/2026–março/2027. Conferência direta no banco confirmou exatamente seis Transactions e seis faturas, nenhuma anterior.
+- C: total 100, quantidade 3, início 3 → uma Transaction 3/3 de 33.34, mantendo original 100.
+
+Capturas da prévia e do detalhe em desktop (1440), tablet (768) e celular (390), sem overflow horizontal ou erros no console:
+
+- [Prévia desktop](screenshots/installments-retro-preview-desktop.png), [tablet](screenshots/installments-retro-preview-tablet.png), [celular](screenshots/installments-retro-preview-mobile.png).
+- [Detalhe desktop](screenshots/installments-retro-detail-desktop.png), [tablet](screenshots/installments-retro-detail-tablet.png), [celular](screenshots/installments-retro-detail-mobile.png).
+
+A limitação anterior de idempotência HTTP permanece. Nenhuma recorrência ou mudança na FIN-8 foi incluída.
+
+Resultado final do complemento: `pnpm lint`, `pnpm build`, `pnpm test`, `pnpm format:check`, `pnpm db:validate`, `pnpm test:database` e `pnpm db:test` aprovados. Foram 40 testes API/calendário, 55 Web e 47 de integração PostgreSQL, além do script de integridade dos 11 modelos. A regressão Chromium dos cenários anteriores (comum novo, cartão novo e pagamento de fatura) também passou nos três viewports, sem erros de console. Permanecem os avisos não bloqueantes de bundle e driver descritos acima.

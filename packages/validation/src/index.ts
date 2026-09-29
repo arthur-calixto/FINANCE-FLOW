@@ -216,37 +216,96 @@ export type CreatePurchase = z.infer<typeof createPurchaseSchema>;
 export type PayInvoice = z.infer<typeof payInvoiceSchema>;
 
 export const installmentCountSchema = z.number().int().min(1).max(120);
-const installmentBase = {
-  description: z.string().trim().min(1).max(500),
-  totalAmount: positiveMoneySchema,
+const installmentValues = {
+  amountMode: z.enum(['TOTAL', 'INSTALLMENT']).default('TOTAL'),
+  totalAmount: positiveMoneySchema.optional(),
+  installmentAmount: positiveMoneySchema.optional(),
   installmentCount: installmentCountSchema,
-  transactionDate: civilDateSchema,
+  startingInstallment: installmentCountSchema.default(1),
+};
+function validateInstallmentValues(
+  v: {
+    amountMode: string;
+    totalAmount?: string;
+    installmentAmount?: string;
+    installmentCount: number;
+    startingInstallment: number;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (
+    v.amountMode === 'TOTAL'
+      ? !v.totalAmount || v.installmentAmount !== undefined
+      : !v.installmentAmount || v.totalAmount !== undefined
+  )
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Informe somente o valor correspondente ao modo selecionado.',
+      path: [v.amountMode === 'TOTAL' ? 'totalAmount' : 'installmentAmount'],
+    });
+  if (v.startingInstallment > v.installmentCount)
+    ctx.addIssue({
+      code: 'custom',
+      message: 'A parcela inicial não pode exceder a quantidade total.',
+      path: ['startingInstallment'],
+    });
+}
+const cardInstallmentDates = {
+  transactionDate: civilDateSchema.optional(),
+  firstInvoiceMonth: monthSchema.optional(),
+};
+function validateCardInstallmentDates(
+  v: {
+    startingInstallment: number;
+    transactionDate?: string;
+    firstInvoiceMonth?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (
+    v.startingInstallment === 1
+      ? !v.transactionDate || v.firstInvoiceMonth !== undefined
+      : !v.firstInvoiceMonth
+  )
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        'Novo parcelamento exige data da compra; em andamento exige primeira fatura controlada.',
+      path: [
+        v.startingInstallment === 1 ? 'transactionDate' : 'firstInvoiceMonth',
+      ],
+    });
+}
+const installmentBase = {
+  ...installmentValues,
+  description: z.string().trim().min(1).max(500),
   categoryId: uuidSchema,
   notes: z.string().trim().max(5000).nullable().optional(),
 };
 export const createInstallmentSchema = z
   .object({
     ...installmentBase,
+    transactionDate: civilDateSchema,
     type: categoryTypeSchema,
     firstDueDate: civilDateSchema,
     accountId: uuidSchema,
   })
-  .strict();
-export const createCardInstallmentSchema = z.object(installmentBase).strict();
+  .strict()
+  .superRefine(validateInstallmentValues);
+export const createCardInstallmentSchema = z
+  .object({ ...installmentBase, ...cardInstallmentDates })
+  .strict()
+  .superRefine(validateInstallmentValues)
+  .superRefine(validateCardInstallmentDates);
 export const installmentPreviewSchema = z
-  .object({
-    totalAmount: positiveMoneySchema,
-    installmentCount: installmentCountSchema,
-    firstDueDate: civilDateSchema,
-  })
-  .strict();
+  .object({ ...installmentValues, firstDueDate: civilDateSchema })
+  .strict()
+  .superRefine(validateInstallmentValues);
 export const cardInstallmentPreviewSchema = z
-  .object({
-    totalAmount: positiveMoneySchema,
-    installmentCount: installmentCountSchema,
-    transactionDate: civilDateSchema,
-  })
-  .strict();
+  .object({ ...installmentValues, ...cardInstallmentDates })
+  .strict()
+  .superRefine(validateInstallmentValues)
+  .superRefine(validateCardInstallmentDates);
 export const cancelInstallmentsSchema = z
   .object({
     fromInstallmentNumber: installmentCountSchema,

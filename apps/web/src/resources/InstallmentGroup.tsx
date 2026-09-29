@@ -125,6 +125,17 @@ function GroupContent({ ws, id }: { ws: string; id: string }) {
             </Button>
           )}
       </div>
+      <p>
+        Valor original: {formatMoney(group.totalAmount)} ·{' '}
+        {group.installmentCount} parcelas.
+        <br />
+        Controle iniciado em {group.startingInstallment}/
+        {group.installmentCount}.<br />
+        Parcelas anteriores ao FINANCE FLOW: {group.previousInstallmentCount}.
+        <br />
+        Valor controlado inicialmente: {formatMoney(group.controlledAmount)} (
+        {group.controlledInstallmentCount} parcelas).
+      </p>
       <p className="form-note">
         Estrutura preservada após a criação.{' '}
         {card

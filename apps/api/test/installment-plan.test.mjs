@@ -89,3 +89,139 @@ test('cartão avança competência sem recalcular compra original', () => {
   );
   assert.equal(short.installments.length, 12);
 });
+
+test('valor individual exato e limite Decimal do total original', async () => {
+  const { installmentTotal } =
+    await import('../dist/resources/installment-plan.js');
+  for (const [amount, count, expected] of [
+    ['100', 5, '500.00'],
+    ['333.33', 3, '999.99'],
+    ['0.01', 120, '1.20'],
+  ]) {
+    const total = installmentTotal({
+      amountMode: 'INSTALLMENT',
+      installmentAmount: amount,
+      installmentCount: count,
+    });
+    assert.equal(total, expected);
+    assert.ok(
+      splitInstallments(total, count).every(
+        (v) => cents(v) === cents(splitInstallments(amount, 1)[0]),
+      ),
+    );
+  }
+  assert.throws(() =>
+    installmentTotal({
+      amountMode: 'INSTALLMENT',
+      installmentAmount: '99999999999999999.99',
+      installmentCount: 2,
+    }),
+  );
+});
+test('retroativo preserva numeração, dia-base e resíduo original', () => {
+  const plan = commonInstallmentPlan('100', 3, '2026-10-10', 3);
+  assert.deepEqual(plan.installments, [
+    {
+      installmentNumber: 3,
+      amount: '33.34',
+      dueDate: '2026-10-10',
+      competenceDate: '2026-10-01',
+    },
+  ]);
+  assert.equal(plan.totalAmount, '100.00');
+  assert.equal(plan.controlledAmount, '33.34');
+  assert.equal(plan.previousInstallmentCount, 2);
+  const ongoing = commonInstallmentPlan('6000', 12, '2027-01-31', 7);
+  assert.deepEqual(
+    ongoing.installments.map((p) => p.installmentNumber),
+    [7, 8, 9, 10, 11, 12],
+  );
+  assert.deepEqual(
+    ongoing.installments.slice(0, 3).map((p) => p.dueDate),
+    ['2027-01-31', '2027-02-28', '2027-03-31'],
+  );
+  for (const start of [0, -1, 4, 1.5])
+    assert.throws(() => commonInstallmentPlan('100', 3, '2026-10-10', start));
+});
+test('cartão retroativo usa fatura explícita, independente de data histórica', () => {
+  const plan = cardInstallmentPlan('3000', 10, undefined, 25, 10, 5, '2026-10');
+  assert.deepEqual(
+    plan.installments.map((p) => p.installmentNumber),
+    [5, 6, 7, 8, 9, 10],
+  );
+  assert.deepEqual(
+    plan.installments.map((p) => p.competenceDate),
+    [
+      '2026-10-01',
+      '2026-11-01',
+      '2026-12-01',
+      '2027-01-01',
+      '2027-02-01',
+      '2027-03-01',
+    ],
+  );
+  assert.equal(plan.controlledAmount, '1800.00');
+  assert.equal(plan.installments[0].closingDate, '2026-09-25');
+  assert.deepEqual(
+    plan,
+    cardInstallmentPlan('3000', 10, '2001-01-01', 25, 10, 5, '2026-10'),
+  );
+  const short = cardInstallmentPlan(
+    '3000',
+    10,
+    undefined,
+    25,
+    31,
+    8,
+    '2028-01',
+  );
+  assert.deepEqual(
+    short.installments.map((p) => p.dueDate),
+    ['2028-01-31', '2028-02-29', '2028-03-31'],
+  );
+});
+test('contratos rejeitam ambiguidades, campos ausentes e datas incoerentes', async () => {
+  const {
+    installmentPreviewSchema: common,
+    cardInstallmentPreviewSchema: card,
+  } = await import('@finance-flow/validation');
+  const base = {
+    totalAmount: '100',
+    installmentCount: 3,
+    firstDueDate: '2026-10-10',
+  };
+  assert.equal(common.parse(base).amountMode, 'TOTAL');
+  assert.equal(common.parse(base).startingInstallment, 1);
+  for (const patch of [
+    { amountMode: 'INSTALLMENT' },
+    { installmentAmount: '10' },
+    { totalAmount: undefined },
+    { amountMode: 'INSTALLMENT', installmentAmount: '10' },
+    { amountMode: 'OTHER' },
+    { startingInstallment: 0 },
+    { startingInstallment: -1 },
+    { startingInstallment: 4 },
+    { startingInstallment: 1.5 },
+    {
+      amountMode: 'INSTALLMENT',
+      totalAmount: undefined,
+      installmentAmount: '0',
+    },
+  ])
+    assert.equal(common.safeParse({ ...base, ...patch }).success, false);
+  const valid = {
+    amountMode: 'INSTALLMENT',
+    installmentAmount: '300',
+    installmentCount: 10,
+    startingInstallment: 5,
+    firstInvoiceMonth: '2026-10',
+  };
+  assert.equal(card.safeParse(valid).success, true);
+  for (const patch of [
+    { firstInvoiceMonth: undefined },
+    { firstInvoiceMonth: '2026-13' },
+    { startingInstallment: 1 },
+    { transactionDate: '2026-02-30' },
+  ])
+    assert.equal(card.safeParse({ ...valid, ...patch }).success, false);
+});
