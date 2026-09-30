@@ -1,3 +1,4 @@
+import { Recurrences } from './resources/Recurrences';
 import { InstallmentGroup } from './resources/InstallmentGroup';
 import { CreditCards } from './resources/CreditCards';
 import { CardInvoices } from './resources/CardInvoices';
@@ -224,6 +225,8 @@ export function AppRoutes() {
           path="credit-cards/:cardId/invoices/:invoiceId"
           element={<CardInvoices />}
         />
+        <Route path="recurrences" element={<Recurrences />} />
+        <Route path="recurrences/:id" element={<Recurrences />} />
         <Route path="transactions" element={<Transactions />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="categories" element={<Categories />} />

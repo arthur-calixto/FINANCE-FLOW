@@ -146,6 +146,7 @@ export const createTransactionSchema = transactionFields.refine(
 );
 export const updateTransactionSchema = transactionFields
   .partial()
+  .extend({ recurrenceScope: z.literal('ONE').optional() })
   .refine((v) => Object.keys(v).length > 0, 'Informe ao menos um campo');
 export const payTransactionSchema = z
   .object({
@@ -319,3 +320,42 @@ export type CardInstallmentPreviewInput = z.infer<
   typeof cardInstallmentPreviewSchema
 >;
 export type CancelInstallments = z.infer<typeof cancelInstallmentsSchema>;
+
+export const recurrenceFrequencySchema = z.enum(['MONTHLY', 'YEARLY']);
+const recurrenceDefaults = {
+  description: z.string().trim().min(1).max(500),
+  expectedAmount: positiveMoneySchema,
+  accountId: uuidSchema,
+  categoryId: uuidSchema,
+  notes: z.string().trim().max(5000).nullable().optional(),
+};
+const recurrenceCalendar = {
+  frequency: recurrenceFrequencySchema,
+  firstDueDate: civilDateSchema,
+  interval: z.number().int().min(1).max(120).default(1),
+};
+export const recurrencePreviewSchema = z
+  .object({ ...recurrenceCalendar, expectedAmount: positiveMoneySchema })
+  .strict();
+export const createRecurrenceSchema = z
+  .object({
+    ...recurrenceDefaults,
+    ...recurrenceCalendar,
+    type: categoryTypeSchema,
+  })
+  .strict();
+export const updateRecurrenceSchema = z
+  .object(recurrenceDefaults)
+  .partial()
+  .extend({ fromTransactionId: uuidSchema })
+  .strict()
+  .refine(
+    (v) => Object.keys(v).some((k) => k !== 'fromTransactionId'),
+    'Informe ao menos uma alteração',
+  );
+export const endRecurrenceSchema = z
+  .object({ fromDate: civilDateSchema })
+  .strict();
+export type CreateRecurrence = z.infer<typeof createRecurrenceSchema>;
+export type UpdateRecurrence = z.infer<typeof updateRecurrenceSchema>;
+export type RecurrencePreviewInput = z.infer<typeof recurrencePreviewSchema>;

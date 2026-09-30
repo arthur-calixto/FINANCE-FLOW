@@ -94,6 +94,24 @@ export class CategoriesService {
           throw new BadRequestException(
             'Esta categoria possui lançamentos de outro tipo.',
           );
+        if (
+          id &&
+          data.type &&
+          data.type !== existing?.type &&
+          ((await tx.recurrence.findFirst({
+            where: { workspaceId, categoryId: id, type: { not: data.type } },
+          })) ||
+            (await tx.recurrenceRevision.findFirst({
+              where: {
+                workspaceId,
+                categoryId: id,
+                recurrence: { type: { not: data.type } },
+              },
+            })))
+        )
+          throw new BadRequestException(
+            'Esta categoria possui recorrências de outro tipo.',
+          );
         return id
           ? tx.category.update({
               where: { workspaceId_id: { workspaceId, id } },

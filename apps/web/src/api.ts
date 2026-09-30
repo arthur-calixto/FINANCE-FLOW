@@ -55,6 +55,10 @@ export async function apiRequest(
       'A compra ultrapassa o limite disponível.',
       'O total deve permitir pelo menos R$ 0,01 por parcela.',
       'O valor total excede o máximo permitido.',
+      'A recorrência está encerrada a partir desta ocorrência.',
+      'Não é possível retomar uma recorrência encerrada.',
+      'O encerramento não pode preceder o primeiro vencimento.',
+      'Selecione categoria ativa e compatível deste workspace.',
       'Não é possível cancelar compra parcelada com parcelas pagas.',
       'Selecione uma parcela pendente.',
       'O limite não pode ficar abaixo do valor utilizado.',
@@ -72,7 +76,8 @@ export async function apiRequest(
     if (
       (path.startsWith('/credit-cards') ||
         path.startsWith('/installments') ||
-        path.startsWith('/installment-groups')) &&
+        path.startsWith('/installment-groups') ||
+        path.startsWith('/recurrences')) &&
       [400, 409].includes(response.status)
     ) {
       const body = (await response.json().catch(() => null)) as {

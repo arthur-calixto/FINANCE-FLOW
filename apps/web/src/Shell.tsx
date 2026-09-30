@@ -69,6 +69,9 @@ export function AppShell() {
           <NavLink to="/app/credit-cards">
             ▤ <span>Cartões</span>
           </NavLink>
+          <NavLink to="/app/recurrences">
+            ↻ <span>Recorrências</span>
+          </NavLink>
           <NavLink to="/app/categories">
             ⌑ <span>Categorias</span>
           </NavLink>

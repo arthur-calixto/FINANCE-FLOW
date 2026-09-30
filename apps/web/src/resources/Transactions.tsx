@@ -1,3 +1,4 @@
+import { RecurrenceEdit } from './RecurrenceEdit';
 import { InstallmentForm } from './InstallmentForm';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -44,7 +45,7 @@ const statuses = {
 type Editor =
   | { kind: 'edit'; row?: TransactionRecord; type: CategoryType }
   | { kind: 'pay' | 'cancel' | 'reopen'; row: TransactionRecord };
-function TransactionDialog({
+export function TransactionDialog({
   editor,
   accounts,
   categories,
@@ -141,6 +142,17 @@ function TransactionDialog({
       setBusy(false);
     }
   }
+  if (row?.recurrenceId && editor.kind === 'edit')
+    return (
+      <RecurrenceEdit
+        row={row}
+        accounts={accounts}
+        categories={categories}
+        workspaceId={workspaceId}
+        close={close}
+        saved={saved}
+      />
+    );
   if (installments && !row && editor.kind === 'edit')
     return (
       <InstallmentForm
@@ -326,7 +338,9 @@ function TransactionDialog({
             <p>
               {editor.kind === 'reopen'
                 ? 'O lançamento voltará a ficar pendente. O valor realizado conhecido será preservado.'
-                : 'O lançamento será cancelado e removido dos totais. Seu histórico será preservado.'}
+                : row?.recurrenceId
+                  ? 'Somente este lançamento será cancelado. A recorrência e os outros meses continuam ativos.'
+                  : 'O lançamento será cancelado e removido dos totais. Seu histórico será preservado.'}
             </p>
           )}
         </fieldset>
@@ -663,6 +677,14 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
                         </span>
                       )}
                   </div>
+                  {row.recurrenceId && (
+                    <Link
+                      className="button button-secondary"
+                      to={`/app/recurrences/${row.recurrenceId}`}
+                    >
+                      Recorrente · Ver recorrência
+                    </Link>
+                  )}
                   {row.installmentGroupId && (
                     <Link
                       className="button button-secondary"

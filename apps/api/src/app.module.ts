@@ -1,3 +1,6 @@
+import { RecurrencesController } from './resources/recurrences.controller';
+import { RecurrencesService } from './resources/recurrences.service';
+import { RecurrenceClock } from './resources/recurrence-calendar';
 import { InstallmentsController } from './resources/installments.controller';
 import { InstallmentsService } from './resources/installments.service';
 import { CreditCardsController } from './resources/credit-cards.controller';
@@ -27,6 +30,7 @@ import { IdentityController } from './auth/identity.controller';
     TransactionsController,
     CreditCardsController,
     InstallmentsController,
+    RecurrencesController,
   ],
   providers: [
     PrismaService,
@@ -35,6 +39,8 @@ import { IdentityController } from './auth/identity.controller';
     TransactionsService,
     CreditCardsService,
     InstallmentsService,
+    RecurrencesService,
+    RecurrenceClock,
     WriteGuard,
     JwtVerifier,
     AuthGuard,

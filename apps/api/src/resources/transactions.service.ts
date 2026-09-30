@@ -1,3 +1,4 @@
+import { RecurrencesService } from './recurrences.service';
 import {
   BadRequestException,
   ConflictException,
@@ -26,11 +27,13 @@ const relations = {
 const simple = {
   creditCardId: null,
   invoiceId: null,
-  recurrenceId: null,
 };
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly recurrences: RecurrencesService,
+  ) {}
   private present<T extends Transaction>(row: T, today = brazilToday()) {
     return {
       ...row,
@@ -45,6 +48,7 @@ export class TransactionsService {
       transactionDate: civil(row.transactionDate),
       dueDate: civil(row.dueDate),
       competenceDate: civil(row.competenceDate),
+      recurrenceDate: row.recurrenceDate ? civil(row.recurrenceDate) : null,
     };
   }
   private where(
@@ -54,7 +58,6 @@ export class TransactionsService {
     const today = date(brazilToday());
     return {
       workspaceId,
-      recurrenceId: null,
       ...(q.month ? { competenceDate: date(`${q.month}-01`) } : {}),
       ...(q.type ? { type: q.type } : {}),
       ...(q.accountId ? { accountId: q.accountId } : {}),
@@ -72,6 +75,7 @@ export class TransactionsService {
     };
   }
   async list(workspaceId: string, q: TransactionQuery) {
+    await this.recurrences.ensureRecurrenceHorizon(workspaceId);
     return (
       await this.prisma.client.transaction.findMany({
         where: this.where(workspaceId, q),
@@ -85,7 +89,6 @@ export class TransactionsService {
       where: {
         workspaceId,
         id,
-        recurrenceId: null,
       },
       include: relations,
     });
@@ -93,6 +96,7 @@ export class TransactionsService {
     return this.present(row);
   }
   async summary(workspaceId: string, month: string) {
+    await this.recurrences.ensureRecurrenceHorizon(workspaceId);
     const groups = await this.prisma.client.transaction.groupBy({
       by: ['type', 'status'],
       where: {
@@ -168,8 +172,10 @@ export class TransactionsService {
       throw new BadRequestException('Responsável inválido neste workspace.');
   }
   private fields(data: CreateTransaction | UpdateTransaction) {
+    const { recurrenceScope, ...fields } = data as UpdateTransaction;
+    void recurrenceScope;
     return {
-      ...data,
+      ...fields,
       ...(data.transactionDate
         ? { transactionDate: date(data.transactionDate) }
         : {}),
@@ -234,6 +240,20 @@ export class TransactionsService {
   }
   update(workspaceId: string, id: string, data: UpdateTransaction) {
     return this.mutate(workspaceId, id, async (tx, row) => {
+      if (row.recurrenceId) {
+        if (data.recurrenceScope !== 'ONE')
+          throw new BadRequestException(
+            'Escolha como aplicar a alteração da recorrência.',
+          );
+        if (
+          (data.type && data.type !== row.type) ||
+          data.expectedAmount === null
+        )
+          throw new BadRequestException(
+            'Preserve o tipo e um valor previsto positivo na ocorrência.',
+          );
+      } else if (data.recurrenceScope)
+        throw new BadRequestException('Este lançamento não é recorrente.');
       if (row.installmentGroupId)
         throw new ConflictException(
           'Parcelas não podem ser editadas após a geração.',
@@ -266,7 +286,16 @@ export class TransactionsService {
     });
   }
   reopen(workspaceId: string, id: string) {
-    return this.mutate(workspaceId, id, async (_tx, row) => {
+    return this.mutate(workspaceId, id, async (tx, row) => {
+      if (row.recurrenceId && row.recurrenceDate) {
+        const series = await tx.recurrence.findFirst({
+          where: { workspaceId, id: row.recurrenceId },
+        });
+        if (series?.endDate && row.recurrenceDate >= series.endDate)
+          throw new ConflictException(
+            'A recorrência está encerrada a partir desta ocorrência.',
+          );
+      }
       if (row.status !== 'PAID')
         throw new ConflictException(
           'Somente lançamentos pagos podem ser reabertos.',

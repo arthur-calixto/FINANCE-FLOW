@@ -35,6 +35,7 @@ DECLARE
   extra_account uuid;
   transfer_id uuid;
   second_transaction uuid;
+  revision_id uuid;
   user_email text := gen_random_uuid()::text || '@schema-test.invalid';
   i integer;
   link record;
@@ -186,7 +187,17 @@ BEGIN
   PERFORM pg_temp.expect_error(format('DELETE FROM "Account" WHERE id = %L', accounts[1]), '23503');
   PERFORM pg_temp.expect_error(format('DELETE FROM "Workspace" WHERE id = %L', ws[1]), '23503');
   PERFORM pg_temp.expect_error(format('UPDATE "Account" SET "workspaceId" = %L WHERE id = %L', ws[2], accounts[1]), '23503');
-  RAISE NOTICE 'OK: 11 models exercitados; isolamento, unicidade, datas, Decimal, CHECKs, Transfer.updatedAt e exclusões validados';
+  -- FIN-8: revisões e identidade de ocorrência têm integridade própria.
+  INSERT INTO "RecurrenceRevision" ("workspaceId", "recurrenceId", "effectiveDate", description, "expectedAmount", "accountId", "categoryId", "createdBy", "updatedAt")
+    VALUES (ws[1], recurrences[1], '2027-01-10', 'Reajuste', 135, accounts[1], categories[1], user_id, now()) RETURNING id INTO revision_id;
+  PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceRevision" SET "accountId" = %L WHERE id = %L', accounts[2], revision_id), '23503');
+  PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceRevision" SET "categoryId" = %L WHERE id = %L', categories[2], revision_id), '23503');
+  PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceRevision" SET "recurrenceId" = %L WHERE id = %L', recurrences[2], revision_id), '23503');
+  PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceRevision" SET "expectedAmount" = 0 WHERE id = %L', revision_id), '23514');
+  PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceRevision" SET "expectedAmount" = ''NaN'' WHERE id = %L', revision_id), '23514');
+  UPDATE "Transaction" SET "recurrenceDate" = '2026-10-10' WHERE id = second_transaction;
+  PERFORM pg_temp.expect_error(format('UPDATE "Transaction" SET "recurrenceId" = %L, "recurrenceDate" = ''2026-10-10'' WHERE id = %L', recurrences[1], transactions[1]), '23505');
+  RAISE NOTICE 'OK: 12 models exercitados; isolamento, unicidade, datas, Decimal, CHECKs, Transfer.updatedAt e exclusões validados';
 END;
 $$;
 ROLLBACK;

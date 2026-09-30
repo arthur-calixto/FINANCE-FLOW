@@ -17,3 +17,5 @@ A Task 05 adiciona TransactionsService e a tela de lançamentos simples. Compet�
 A Task 06 introduz CreditCardsService, calendário central no backend e telas de cartões/faturas. Pagamento integral usa a própria CreditCardInvoice para registrar conta e valor de caixa, mantendo Transactions como única fonte de despesas econômicas. Locks transacionais protegem limite, unicidade e liquidação. Veja [cartões e faturas](credit-cards.md).
 
 A Task 07 reutiliza InstallmentGroup sem migration. InstallmentsService gera planos comuns/cartão atomicamente, reutiliza calendário e locks da FIN-6 e expõe prévias ao frontend. Ver [parcelamentos](installments.md).
+
+A FIN-8 reutiliza Recurrence e acrescenta RecurrenceRevision para regras futuras, notes padrão e identidade imutável recurrenceDate em Transaction. RecurrencesService garante uma janela de 12 meses nas leituras de recorrências e lançamentos/resumo, com lock por workspace e unicidade de ocorrência no PostgreSQL. Não depende de cron. Ver [recorrências](recurrences.md).

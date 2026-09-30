@@ -46,6 +46,8 @@ export interface CategoryRecord {
 
 export type TransactionStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 export interface TransactionRecord {
+  recurrenceId?: string | null;
+  recurrenceDate?: string | null;
   installmentGroupId?: string | null;
   installmentNumber?: number | null;
   installmentGroup?: { id: string; installmentCount: number } | null;
@@ -157,4 +159,41 @@ export interface InstallmentGroupRecord extends InstallmentControl {
   account: { id: string; name: string } | null;
   creditCard: { id: string; name: string } | null;
   installments: TransactionRecord[];
+}
+
+export interface RecurrencePreview {
+  from: string;
+  until: string;
+  occurrences: {
+    dueDate: string;
+    competenceDate: string;
+    expectedAmount: string;
+  }[];
+}
+export interface RecurrenceRecord {
+  id: string;
+  description: string;
+  type: CategoryType;
+  expectedAmount: string;
+  frequency: 'MONTHLY' | 'YEARLY';
+  interval: number;
+  dueDay: number;
+  startDate: string;
+  endDate: string | null;
+  nextDueDate: string | null;
+  status: 'ACTIVE' | 'ENDING' | 'ENDED';
+  isActive: boolean;
+  accountId: string;
+  categoryId: string;
+  account: { id: string; name: string } | null;
+  category: { id: string; name: string } | null;
+  notes: string | null;
+}
+export interface RecurrenceDetail extends RecurrenceRecord {
+  occurrences: TransactionRecord[];
+  revisions: {
+    effectiveDate: string;
+    expectedAmount: string;
+    description: string;
+  }[];
 }
