@@ -221,25 +221,27 @@ model Transaction {
 
 /// CHECKs SQL: installmentCount > 0 e totalAmount positivo.
 model InstallmentGroup {
-  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId      String        @db.Uuid
-  description      String
-  totalAmount      Decimal       @db.Decimal(19, 2)
-  installmentCount Int
-  purchaseDate     DateTime      @db.Date
-  categoryId       String?       @db.Uuid
-  accountId        String?       @db.Uuid
-  creditCardId     String?       @db.Uuid
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId         String        @db.Uuid
+  description         String
+  totalAmount         Decimal       @db.Decimal(19, 2)
+  installmentCount    Int
+  /// Início original do controle, preservado após exclusões individuais.
+  startingInstallment Int           @default(1)
+  purchaseDate        DateTime      @db.Date
+  categoryId          String?       @db.Uuid
+  accountId           String?       @db.Uuid
+  creditCardId        String?       @db.Uuid
   /// Deve identificar membro autorizado deste workspace no momento da criação.
-  createdBy        String        @db.Uuid
-  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
-  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  creator          User          @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  account          Account?      @relation(fields: [workspaceId, accountId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  category         Category?     @relation(fields: [workspaceId, categoryId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  creditCard       CreditCard?   @relation(fields: [workspaceId, creditCardId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  transactions     Transaction[]
+  createdBy           String        @db.Uuid
+  createdAt           DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(3)
+  workspace           Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  creator             User          @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  account             Account?      @relation(fields: [workspaceId, accountId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  category            Category?     @relation(fields: [workspaceId, categoryId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  creditCard          CreditCard?   @relation(fields: [workspaceId, creditCardId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  transactions        Transaction[]
 
   @@unique([workspaceId, id])
   @@index([workspaceId, categoryId])
@@ -250,30 +252,31 @@ model InstallmentGroup {
 
 /// CHECKs SQL: dueDay entre 1 e 31, interval > 0, expectedAmount positivo.
 model Recurrence {
-  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId        String               @db.Uuid
+  id                 String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId        String                          @db.Uuid
   description        String
   notes              String?
   type               TransactionType
-  expectedAmount     Decimal              @db.Decimal(19, 2)
-  categoryId         String?              @db.Uuid
-  accountId          String?              @db.Uuid
+  expectedAmount     Decimal                         @db.Decimal(19, 2)
+  categoryId         String?                         @db.Uuid
+  accountId          String?                         @db.Uuid
   frequency          RecurrenceFrequency
-  interval           Int                  @default(1)
+  interval           Int                             @default(1)
   dueDay             Int
-  startDate          DateTime             @db.Date
-  endDate            DateTime?            @db.Date
-  nextGenerationDate DateTime             @db.Date
-  isActive           Boolean              @default(true)
+  startDate          DateTime                        @db.Date
+  endDate            DateTime?                       @db.Date
+  nextGenerationDate DateTime                        @db.Date
+  isActive           Boolean                         @default(true)
   /// Deve identificar membro autorizado deste workspace no momento da criação.
-  createdBy          String               @db.Uuid
-  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
-  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  creator            User                 @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  account            Account?             @relation(fields: [workspaceId, accountId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
-  category           Category?            @relation(fields: [workspaceId, categoryId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy          String                          @db.Uuid
+  createdAt          DateTime                        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                        @updatedAt @db.Timestamptz(3)
+  workspace          Workspace                       @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  creator            User                            @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  account            Account?                        @relation(fields: [workspaceId, accountId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+  category           Category?                       @relation(fields: [workspaceId, categoryId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
   transactions       Transaction[]
+  exclusions         RecurrenceOccurrenceExclusion[]
   revisions          RecurrenceRevision[]
 
   @@unique([workspaceId, id])
@@ -383,4 +386,16 @@ model RecurrenceRevision {
   @@index([workspaceId, accountId])
   @@index([workspaceId, categoryId])
   @@index([createdBy])
+}
+
+/// Registro técnico sem valores financeiros: impede recriar uma ocorrência excluída.
+model RecurrenceOccurrenceExclusion {
+  recurrenceId   String     @db.Uuid
+  workspaceId    String     @db.Uuid
+  recurrenceDate DateTime   @db.Date
+  createdAt      DateTime   @default(now()) @db.Timestamptz(3)
+  recurrence     Recurrence @relation(fields: [workspaceId, recurrenceId], references: [workspaceId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([recurrenceId, recurrenceDate])
+  @@index([workspaceId, recurrenceId])
 }

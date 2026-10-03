@@ -6,18 +6,18 @@ A rota `/app/transactions` oferece receitas e despesas avulsas, consulta mensal,
 
 Todos os endpoints exigem JWT válido, `X-Workspace-Id` e membership. OWNER, ADMIN e MEMBER escrevem; VIEWER apenas consulta. Todas as operações e referências são limitadas ao workspace. Conhecer o UUID de outro tenant não concede acesso (404). Selecionar workspace sem membership retorna 403.
 
-| Método | Rota                                  | Resultado                                         |
-| ------ | ------------------------------------- | ------------------------------------------------- |
-| GET    | `/transactions`                       | Lista por vencimento e ID, com filtros opcionais. |
-| GET    | `/transactions/summary?month=2026-10` | Resumo da competência; mês obrigatório.           |
-| GET    | `/transactions/:id`                   | Detalhe, incluindo cancelados.                    |
-| POST   | `/transactions`                       | Cria PENDING; HTTP 201.                           |
-| PATCH  | `/transactions/:id`                   | Edita pendente/atrasado; HTTP 200.                |
-| DELETE | `/transactions/:id`                   | Cancela, sem exclusão física; HTTP 200.           |
-| POST   | `/transactions/:id/pay`               | Paga ou recebe; HTTP 200.                         |
-| POST   | `/transactions/:id/reopen`            | Reabre pago; body vazio; HTTP 200.                |
+| Método | Rota                                  | Resultado                                                |
+| ------ | ------------------------------------- | -------------------------------------------------------- |
+| GET    | `/transactions`                       | Lista por vencimento, descrição e ID; filtros opcionais. |
+| GET    | `/transactions/summary?month=2026-10` | Resumo da competência; mês obrigatório.                  |
+| GET    | `/transactions/:id`                   | Detalhe, incluindo cancelados.                           |
+| POST   | `/transactions`                       | Cria PENDING; HTTP 201.                                  |
+| PATCH  | `/transactions/:id`                   | Edita pendente/atrasado; HTTP 200.                       |
+| DELETE | `/transactions/:id`                   | Cancela, sem exclusão física; HTTP 200.                  |
+| POST   | `/transactions/:id/pay`               | Paga ou recebe; HTTP 200.                                |
+| POST   | `/transactions/:id/reopen`            | Reabre pago; body vazio; HTTP 200.                       |
 
-Filtros: `month=YYYY-MM`, `type`, `status`, `accountId`, `categoryId` e `search` por descrição (sem distinguir maiúsculas). Filtros são combinados por AND. Sem mês, a API lista todos os lançamentos simples do workspace. A Web sempre informa mês, possui filtros de tipo/status/conta/categoria e navegação mensal. Cancelados ficam consultáveis e identificados; não entram nos totais.
+Filtros: `month=YYYY-MM`, `type`, `status`, `accountId`, `categoryId` e `search` por descrição (sem distinguir maiúsculas). Filtros são combinados por AND. Sem mês, a API lista todos os lançamentos do workspace. A Web sempre informa mês e possui busca/status/conta/categoria e navegação mensal. Cancelados ficam consultáveis e identificados; não entram nos totais.
 
 Na criação/edição bancária, os campos de cartão, fatura, parcelamento e recorrência não são aceitos. A Task 06 inclui compras simples no cartão nas consultas e no resumo, com indicação e link da fatura. Mutações bancárias não alteram essas compras: baixa ocorre pela fatura, e cancelamento pela rota do cartão. A Task 07 também inclui parcelas nas consultas/resumo e permite baixa/reabertura/cancelamento de parcelas comuns; PATCH estrutural fica bloqueado. A FIN-8 inclui ocorrências recorrentes nas consultas/resumo e nos fluxos de baixa, reabertura e cancelamento individual. A edição exige escolha explícita de alcance; a janela é garantida antes de listar ou resumir. Veja [recorrências](recurrences.md). Veja [cartões e faturas](credit-cards.md).
 
@@ -86,7 +86,7 @@ OVERDUE é calculado na leitura: pendente com dueDate menor que o dia atual bras
 
 `expected` soma expectedAmount dos registros não cancelados, inclusive pagos; null contribui zero e não recebe fallback de amount. `realized` soma amount **somente de PAID**. Registros com amount conhecido mas ainda pendentes não contam como realizados. CANCELLED é excluído de ambos. A competência, não paidAt, determina o mês dos totais. Soma realizada no PostgreSQL NUMERIC e composição via Decimal, sem Number.
 
-Os quatro indicadores na tela representam todo o mês. Filtros da listagem não alteram esses indicadores; isso é indicado na interface. Valores diferentes exibem previsto, realizado e diferença por lançamento. Diferenças usam centavos inteiros com BigInt. Não há gráficos ou dashboard.
+Na FIN-9, a tela consome `/transactions/month-view`, com resumo e subtotais correspondentes aos filtros. O endpoint `/transactions/summary` mantém o resumo completo do mês. A interface mostra três indicadores: receitas, despesas e resultado, com realizado secundário. Valores diferentes exibem previsto, realizado e diferença por lançamento. Diferenças usam centavos inteiros com BigInt. Não há gráficos ou dashboard.
 
 ## Estado por workspace
 
@@ -119,3 +119,7 @@ Desktop (1440 px), tablet (768 px) e celular (390 px) sem erros de console ou ov
 A suíte mantém os testes anteriores. O build emite o aviso já existente de bundle Web acima de 500 kB; não impede build ou execução.
 
 Parcelas comuns e de cartão são identificadas por installmentGroupId/installmentNumber e descrições “1/N”. Detalhe e regras da FIN-7 em [parcelamentos](installments.md).
+
+## Evolução FIN-9
+
+A visão mensal agora separa receitas fixas/outras e despesas fixas/cartões/outras. `POST /transactions/:id/cancel` é o cancelamento explícito utilizado pela Web; `DELETE /transactions/:id` permanece como alias legado de cancelamento. `DELETE /transactions/:id/permanent`, com `{ "confirm": true }`, remove fisicamente quando permitido. Regras, schema, atomicidade e evidências em [visão mensal e exclusão definitiva](transactions-view.md).

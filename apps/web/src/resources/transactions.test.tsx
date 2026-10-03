@@ -1,3 +1,6 @@
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+import { monthViewFixture } from '../../test/month-view';
 import {
   afterEach,
   beforeAll,
@@ -10,7 +13,7 @@ import {
 import {
   cleanup,
   fireEvent,
-  render,
+  render as rtlRender,
   screen,
   waitFor,
   within,
@@ -42,6 +45,9 @@ import { moneyDifference } from '../money';
 const account = '00000000-0000-4000-8000-000000000001',
   expense = '00000000-0000-4000-8000-000000000002',
   income = '00000000-0000-4000-8000-000000000003';
+function render(ui: ReactElement) {
+  return rtlRender(ui, { wrapper: MemoryRouter });
+}
 let rows: TransactionRecord[];
 const month = () => brazilToday().slice(0, 7);
 const fixture = (
@@ -96,23 +102,24 @@ beforeEach(() => {
           { id: expense, name: 'Energia', type: 'EXPENSE', isActive: true },
           { id: income, name: 'Salário', type: 'INCOME', isActive: true },
         ];
-      if (path.startsWith('/transactions/summary'))
-        return {
-          income: { expected: '5000.00', realized: '0.00' },
-          expense: { expected: '200.00', realized: '0.00' },
-        };
       if (!options)
-        return rows
-          .filter(
+        return monthViewFixture(
+          rows.filter(
             (r) =>
               r.workspaceId === ws &&
               r.competenceDate.slice(0, 7) === url.searchParams.get('month') &&
-              (!url.searchParams.get('type') ||
-                r.type === url.searchParams.get('type')) &&
+              (!url.searchParams.get('search') ||
+                r.description
+                  .toLowerCase()
+                  .includes(url.searchParams.get('search')!.toLowerCase())) &&
               (!url.searchParams.get('status') ||
-                r.status === url.searchParams.get('status')),
-          )
-          .map((r) => ({ ...r }));
+                r.status === url.searchParams.get('status')) &&
+              (!url.searchParams.get('accountId') ||
+                r.accountId === url.searchParams.get('accountId')) &&
+              (!url.searchParams.get('categoryId') ||
+                r.categoryId === url.searchParams.get('categoryId')),
+          ),
+        );
       if (path === '/transactions') {
         const r = fixture({
           ...options.body,
@@ -126,7 +133,9 @@ beforeEach(() => {
         Object.assign(r, options.body, { status: 'PAID' });
       else if (path.endsWith('/reopen'))
         Object.assign(r, { status: 'PENDING', paidAt: null });
-      else if (options.method === 'DELETE') r.status = 'CANCELLED';
+      else if (path.endsWith('/permanent'))
+        rows = rows.filter((row) => row.id !== r.id);
+      else if (path.endsWith('/cancel')) r.status = 'CANCELLED';
       else Object.assign(r, options.body);
       return { ...r };
     },
@@ -177,7 +186,7 @@ describe('Lançamentos', () => {
     await create('receita');
     expect(rows[0].type).toBe('INCOME');
   });
-  it('navegação mensal e filtro de tipo', async () => {
+  it('navegação mensal e busca', async () => {
     rows = [
       fixture(),
       fixture({ description: 'Salário', type: 'INCOME' }),
@@ -189,10 +198,10 @@ describe('Lançamentos', () => {
     const user = userEvent.setup();
     render(<Transactions />);
     await screen.findByRole('heading', { name: 'Energia' });
-    await user.selectOptions(screen.getByLabelText('Filtrar tipo'), 'INCOME');
+    await user.type(screen.getByLabelText('Buscar lançamento'), 'Salário');
     await screen.findByRole('heading', { name: 'Salário' });
     expect(screen.queryByRole('heading', { name: 'Energia' })).toBeNull();
-    await user.selectOptions(screen.getByLabelText('Filtrar tipo'), '');
+    await user.clear(screen.getByLabelText('Buscar lançamento'));
     await screen.findByRole('heading', { name: 'Energia' });
     await user.click(screen.getByRole('button', { name: 'Próximo mês' }));
     await screen.findByRole('heading', { name: 'Próximo' });
@@ -208,10 +217,13 @@ describe('Lançamentos', () => {
     await user.clear(input);
     await user.type(input, '217,30');
     await user.click(screen.getByRole('button', { name: 'Confirmar baixa' }));
+    await user.click(
+      await screen.findByLabelText('Ações de ' + rows[0].description),
+    );
     await screen.findByRole('button', { name: 'Reabrir' });
     expect(screen.getByText('Diferença')).toBeTruthy();
     expect(screen.getByText(/^R\$\s17,30$/)).toBeTruthy();
-    expect(screen.getByText(/217,30/)).toBeTruthy();
+    expect(screen.getAllByText(/217,30/).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: 'Reabrir' }));
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {
@@ -228,6 +240,9 @@ describe('Lançamentos', () => {
     await user.click(await screen.findByRole('button', { name: 'Receber' }));
     expect(screen.getByLabelText('Valor recebido (R$)')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Confirmar baixa' }));
+    await user.click(
+      await screen.findByLabelText('Ações de ' + rows[0].description),
+    );
     await screen.findByRole('button', { name: 'Reabrir' });
     expect(screen.getAllByText('Recebido').length).toBeGreaterThan(0);
   });
@@ -235,6 +250,7 @@ describe('Lançamentos', () => {
     rows = [fixture()];
     const user = userEvent.setup();
     render(<Transactions />);
+    await user.click(await screen.findByLabelText('Ações de Energia'));
     await user.click(
       await screen.findByRole('button', { name: 'Cancelar lançamento' }),
     );
@@ -259,7 +275,7 @@ describe('Lançamentos', () => {
     await screen.findByText('Nenhum lançamento neste mês.');
     expect(
       mocks.request.mock.calls.some(
-        (c) => c[0].startsWith('/transactions/summary') && c[1] === 'b',
+        (c) => c[0].startsWith('/transactions/month-view') && c[1] === 'b',
       ),
     ).toBe(true);
   });
@@ -289,5 +305,251 @@ describe('Lançamentos', () => {
     await screen.findByRole('alert');
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     await screen.findByText('Nenhum lançamento neste mês.');
+  });
+});
+
+describe('FIN-9 — hierarquia e exclusão', () => {
+  it('dataset oficial ocupa exatamente os grupos esperados e soma 6000/1870/4130', async () => {
+    rows = [
+      fixture({
+        description: 'Salário',
+        type: 'INCOME',
+        recurrenceId: 'salary',
+        expectedAmount: '5000.00',
+      }),
+      fixture({
+        description: 'Freelance',
+        type: 'INCOME',
+        expectedAmount: '1000.00',
+      }),
+      fixture({
+        description: 'Internet',
+        recurrenceId: 'internet',
+        expectedAmount: '120.00',
+      }),
+      fixture({
+        description: 'Condomínio',
+        recurrenceId: 'condo',
+        expectedAmount: '650.00',
+      }),
+      fixture({
+        description: 'Mercado',
+        creditCardId: 'nubank',
+        creditCard: { id: 'nubank', name: 'Nubank Mastercard' },
+        expectedAmount: '350.00',
+        amount: '350.00',
+      }),
+      fixture({
+        description: 'Notebook',
+        creditCardId: 'nubank',
+        creditCard: { id: 'nubank', name: 'Nubank Mastercard' },
+        installmentGroupId: 'notebook',
+        installmentNumber: 5,
+        installmentGroup: { id: 'notebook', installmentCount: 10 },
+        expectedAmount: '300.00',
+        amount: '300.00',
+      }),
+      fixture({
+        description: 'Combustível',
+        creditCardId: 'inter',
+        creditCard: { id: 'inter', name: 'Inter' },
+        expectedAmount: '250.00',
+        amount: '250.00',
+      }),
+      fixture({ description: 'Energia', expectedAmount: '200.00' }),
+      fixture({
+        description: 'Cancelado',
+        status: 'CANCELLED',
+        expectedAmount: '100.00',
+      }),
+    ];
+    const user = userEvent.setup();
+    render(<Transactions />);
+    await screen.findByRole('heading', { name: 'Notebook' });
+    expect(screen.getAllByRole('table')).toHaveLength(6);
+    expect(
+      screen.getByText('Receitas previstas').parentElement!.textContent,
+    ).toMatch(/6.000,00/);
+    expect(
+      screen.getByText('Despesas previstas').parentElement!.textContent,
+    ).toMatch(/1.870,00/);
+    expect(
+      screen.getByText('Resultado previsto').parentElement!.textContent,
+    ).toMatch(/4.130,00/);
+    const group = (name: string) =>
+      screen.getByText(name, { exact: true }).closest('details')!;
+    expect(
+      within(group('Outras receitas')).getByRole('heading', {
+        name: 'Freelance',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(group('Outras despesas')).getByRole('heading', {
+        name: 'Energia',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(group('Nubank Mastercard')).getByRole('heading', {
+        name: 'Mercado',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(group('Nubank Mastercard')).getByText('5/10', { exact: true }),
+    ).toBeTruthy();
+    expect(
+      group('Nubank Mastercard').querySelector('summary')!.textContent,
+    ).toMatch(/650,00/);
+    expect(
+      group('Cartões de crédito').querySelector('summary')!.textContent,
+    ).toMatch(/900,00/);
+    const fixed = screen.getAllByText('Fixas / recorrentes');
+    expect(
+      within(fixed[0].closest('details')!).getByRole('heading', {
+        name: 'Salário',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(fixed[1].closest('details')!).getByRole('heading', {
+        name: 'Internet',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(fixed[1].closest('details')!).getByRole('heading', {
+        name: 'Condomínio',
+      }),
+    ).toBeTruthy();
+    await user.click(group('DESPESAS').querySelector('summary')!);
+    expect(group('DESPESAS').open).toBe(false);
+    await user.click(group('DESPESAS').querySelector('summary')!);
+    expect(group('DESPESAS').open).toBe(true);
+  });
+  it('menu e confirmação forte impedem exclusão acidental; hard delete remove linha e totais', async () => {
+    rows = [fixture()];
+    const user = userEvent.setup();
+    render(<Transactions />);
+    await screen.findByRole('heading', { name: 'Energia' });
+    expect(
+      screen.getByLabelText('Ações de Energia').closest('details')!.open,
+    ).toBe(false);
+    await user.click(screen.getByLabelText('Ações de Energia'));
+    await user.click(
+      screen.getByRole('button', { name: 'Excluir definitivamente' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(
+      within(dialog).getByText(/não aparecerá mais no histórico/),
+    ).toBeTruthy();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Excluir definitivamente' }),
+    );
+    expect(rows).toHaveLength(1);
+    await user.click(
+      within(dialog).getByLabelText('Entendo que a exclusão é definitiva.'),
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Excluir definitivamente' }),
+    );
+    await screen.findByText('Nenhum lançamento neste mês.');
+    expect(rows).toHaveLength(0);
+    expect(
+      screen.getByText('Despesas previstas').parentElement!.textContent,
+    ).toMatch(/0,00/);
+    const call = mocks.request.mock.calls.find((c) =>
+      String(c[0]).endsWith('/permanent'),
+    )!;
+    expect(call[3]).toEqual({ method: 'DELETE', body: { confirm: true } });
+  });
+  it('fatura paga e parcela de cartão exibem bloqueio sem ação destrutiva', async () => {
+    rows = [
+      fixture({
+        description: 'Fatura paga',
+        creditCardId: 'card',
+        creditCard: { id: 'card', name: 'Cartão' },
+        status: 'PAID',
+        permanentDeleteBlockedReason:
+          'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente.',
+      }),
+    ];
+    const user = userEvent.setup();
+    render(<Transactions />);
+    await user.click(await screen.findByLabelText('Ações de Fatura paga'));
+    expect(screen.getByText(/fatura já paga/)).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Excluir definitivamente' }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reabrir' })).toBeNull();
+  });
+  it('ocorrência recorrente excluída desaparece e informa preservação dos próximos meses', async () => {
+    rows = [fixture({ recurrenceId: 'series', description: 'Internet' })];
+    const user = userEvent.setup();
+    render(<Transactions />);
+    await user.click(await screen.findByLabelText('Ações de Internet'));
+    await user.click(
+      screen.getByRole('button', { name: 'Excluir definitivamente' }),
+    );
+    expect(screen.getByText(/não será gerada novamente/)).toBeTruthy();
+    await user.click(
+      screen.getByLabelText('Entendo que a exclusão é definitiva.'),
+    );
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Excluir definitivamente',
+      }),
+    );
+    await screen.findByText('Nenhum lançamento neste mês.');
+    expect(screen.queryByRole('heading', { name: 'Internet' })).toBeNull();
+  });
+  it('status, conta e categoria filtram dentro do mês e atualizam subtotais', async () => {
+    rows = [
+      fixture(),
+      fixture({
+        description: 'Pago',
+        status: 'PAID',
+        accountId: 'another',
+        categoryId: income,
+        expectedAmount: '150.00',
+        amount: '160.00',
+      }),
+    ];
+    const user = userEvent.setup();
+    render(<Transactions />);
+    await screen.findByRole('heading', { name: 'Energia' });
+    await user.selectOptions(screen.getByLabelText('Filtrar status'), 'PAID');
+    await screen.findByRole('heading', { name: 'Pago' });
+    expect(screen.queryByRole('heading', { name: 'Energia' })).toBeNull();
+    expect(
+      screen.getByText('Despesas previstas').parentElement!.textContent,
+    ).toMatch(/150,00/);
+    await user.selectOptions(screen.getByLabelText('Filtrar status'), '');
+    await screen.findByRole('heading', { name: 'Energia' });
+    await user.selectOptions(screen.getByLabelText('Filtrar conta'), account);
+    await screen.findByRole('heading', { name: 'Energia' });
+    expect(screen.queryByRole('heading', { name: 'Pago' })).toBeNull();
+    await user.selectOptions(
+      screen.getByLabelText('Filtrar categoria'),
+      income,
+    );
+    await screen.findByText('Nenhum lançamento neste mês.');
+  });
+  it('erro de exclusão preserva diálogo e lançamento', async () => {
+    rows = [fixture()];
+    const user = userEvent.setup();
+    render(<Transactions />);
+    await user.click(await screen.findByLabelText('Ações de Energia'));
+    await user.click(
+      screen.getByRole('button', { name: 'Excluir definitivamente' }),
+    );
+    await user.click(
+      screen.getByLabelText('Entendo que a exclusão é definitiva.'),
+    );
+    mocks.request.mockRejectedValueOnce(new Error('Não foi possível excluir.'));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Excluir definitivamente',
+      }),
+    );
+    await screen.findByRole('alert');
+    expect(rows).toHaveLength(1);
+    expect(screen.getByRole('dialog')).toBeTruthy();
   });
 });

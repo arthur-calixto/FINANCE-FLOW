@@ -129,19 +129,33 @@ export class RecurrencesService {
         until,
         row.dueDay,
       );
+      const exclusions = new Set(
+        (
+          await tx.recurrenceOccurrenceExclusion.findMany({
+            where: {
+              workspaceId: row.workspaceId,
+              recurrenceId: row.id,
+              recurrenceDate: { gte: asDate(from), lt: asDate(until) },
+            },
+            select: { recurrenceDate: true },
+          })
+        ).map((r) => civil(r.recurrenceDate)),
+      );
       await tx.transaction.createMany({
-        data: dates.map((dueDate) => ({
-          ...this.rule(row, dueDate),
-          workspaceId: row.workspaceId,
-          createdBy: row.createdBy,
-          type: row.type,
-          status: 'PENDING' as const,
-          recurrenceId: row.id,
-          recurrenceDate: asDate(dueDate),
-          transactionDate: asDate(dueDate),
-          dueDate: asDate(dueDate),
-          competenceDate: asDate(dueDate.slice(0, 7) + '-01'),
-        })),
+        data: dates
+          .filter((d) => !exclusions.has(d))
+          .map((dueDate) => ({
+            ...this.rule(row, dueDate),
+            workspaceId: row.workspaceId,
+            createdBy: row.createdBy,
+            type: row.type,
+            status: 'PENDING' as const,
+            recurrenceId: row.id,
+            recurrenceDate: asDate(dueDate),
+            transactionDate: asDate(dueDate),
+            dueDate: asDate(dueDate),
+            competenceDate: asDate(dueDate.slice(0, 7) + '-01'),
+          })),
         skipDuplicates: true,
       });
       await tx.recurrence.update({

@@ -1,6 +1,6 @@
 import { RecurrenceEdit } from './RecurrenceEdit';
 import { InstallmentForm } from './InstallmentForm';
-import { Link } from 'react-router-dom';
+import { TransactionTables } from './TransactionTables';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type {
@@ -8,7 +8,7 @@ import type {
   CategoryRecord,
   CategoryType,
   TransactionRecord,
-  TransactionSummary,
+  TransactionMonthView,
 } from '@finance-flow/types';
 import {
   createTransactionSchema,
@@ -20,7 +20,6 @@ import { apiRequest } from '../api';
 import { formatMoney, parseMoneyInput, moneyDifference } from '../money';
 import {
   brazilToday,
-  formatDate,
   monthLabel,
   shiftMonth,
   paymentTimestamp,
@@ -42,9 +41,9 @@ const statuses = {
   OVERDUE: 'Atrasado',
   CANCELLED: 'Cancelado',
 };
-type Editor =
+export type Editor =
   | { kind: 'edit'; row?: TransactionRecord; type: CategoryType }
-  | { kind: 'pay' | 'cancel' | 'reopen'; row: TransactionRecord };
+  | { kind: 'pay' | 'cancel' | 'reopen' | 'delete'; row: TransactionRecord };
 export function TransactionDialog({
   editor,
   accounts,
@@ -80,7 +79,9 @@ export function TransactionDialog({
           : 'Pagar despesa'
         : editor.kind === 'reopen'
           ? 'Reabrir lançamento'
-          : 'Cancelar lançamento';
+          : editor.kind === 'delete'
+            ? 'Excluir lançamento definitivamente?'
+            : 'Cancelar lançamento';
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -121,16 +122,19 @@ export function TransactionDialog({
           undefined,
           { method: 'POST', body },
         );
-      } else
+      } else {
+        const action = editor.kind === 'delete' ? 'permanent' : editor.kind;
         await apiRequest(
-          `/transactions/${row!.id}${editor.kind === 'reopen' ? '/reopen' : ''}`,
+          `/transactions/${row!.id}/${action}`,
           workspaceId,
           undefined,
           {
-            method: editor.kind === 'reopen' ? 'POST' : 'DELETE',
-            ...(editor.kind === 'reopen' ? { body: {} } : {}),
+            method: editor.kind === 'delete' ? 'DELETE' : 'POST',
+            body:
+              editor.kind === 'delete' ? { confirm: v.confirm === 'on' } : {},
           },
         );
+      }
       saved();
     } catch (e) {
       setError(
@@ -334,6 +338,36 @@ export function TransactionDialog({
                 />
               </FormField>
             </>
+          ) : editor.kind === 'delete' ? (
+            <>
+              <p>
+                <strong>{row!.description}</strong>
+              </p>
+              <p>
+                Este lançamento será removido permanentemente e não aparecerá
+                mais no histórico ou nos relatórios. Esta ação não pode ser
+                desfeita.
+              </p>
+              {row!.status === 'PAID' && (
+                <p>A baixa também será removida dos totais realizados.</p>
+              )}
+              {row!.recurrenceId && (
+                <p>
+                  Somente esta ocorrência será excluída e não será gerada
+                  novamente. Os próximos meses continuam ativos.
+                </p>
+              )}
+              {row!.installmentGroupId && (
+                <p>
+                  Somente esta parcela será removida. A numeração das demais
+                  será preservada.
+                </p>
+              )}
+              <label className="delete-confirmation">
+                <input type="checkbox" name="confirm" required /> Entendo que a
+                exclusão é definitiva.
+              </label>
+            </>
           ) : (
             <p>
               {editor.kind === 'reopen'
@@ -356,7 +390,11 @@ export function TransactionDialog({
           </Button>
           <Button
             disabled={busy}
-            variant={editor.kind === 'cancel' ? 'danger' : 'primary'}
+            variant={
+              editor.kind === 'cancel' || editor.kind === 'delete'
+                ? 'danger'
+                : 'primary'
+            }
           >
             {busy
               ? 'Salvando…'
@@ -366,7 +404,9 @@ export function TransactionDialog({
                   ? 'Confirmar baixa'
                   : editor.kind === 'reopen'
                     ? 'Reabrir'
-                    : 'Confirmar cancelamento'}
+                    : editor.kind === 'delete'
+                      ? 'Excluir definitivamente'
+                      : 'Confirmar cancelamento'}
           </Button>
         </div>
       </form>
@@ -387,13 +427,12 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
   const writable =
     me?.workspaces.find((w) => w.id === workspaceId)?.role !== 'VIEWER';
   const [month, setMonth] = useState(brazilToday().slice(0, 7));
-  const [type, setType] = useState(''),
+  const [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
     [accountId, setAccount] = useState(''),
     [categoryId, setCategory] = useState('');
   const [data, setData] = useState<{
-    rows: TransactionRecord[];
-    summary: TransactionSummary;
+    view: TransactionMonthView;
     accounts: AccountRecord[];
     categories: CategoryRecord[];
   } | null>(null);
@@ -403,7 +442,7 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
     [editor, setEditor] = useState<Editor | null>(null);
   const query = new URLSearchParams({
     month,
-    ...(type ? { type } : {}),
+    ...(search.trim() ? { search: search.trim() } : {}),
     ...(status ? { status } : {}),
     ...(accountId ? { accountId } : {}),
     ...(categoryId ? { categoryId } : {}),
@@ -411,9 +450,8 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
-      apiRequest('/transactions?' + query, workspaceId, controller.signal),
       apiRequest(
-        '/transactions/summary?month=' + month,
+        '/transactions/month-view?' + query,
         workspaceId,
         controller.signal,
       ),
@@ -428,11 +466,10 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
         controller.signal,
       ),
     ])
-      .then(([rows, summary, accounts, categories]) => {
+      .then(([view, accounts, categories]) => {
         if (!controller.signal.aborted)
           setData({
-            rows: rows as TransactionRecord[],
-            summary: summary as TransactionSummary,
+            view: view as TransactionMonthView,
             accounts: accounts as AccountRecord[],
             categories: categories as CategoryRecord[],
           });
@@ -517,23 +554,18 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
         <strong>{monthLabel(month)}</strong>
       </div>
       <div className="transaction-filters">
-        <FormField label="Filtrar tipo">
-          <Select
-            value={type}
-            onChange={(e) =>
-              filter(() => {
-                setType(e.target.value);
-                setCategory('');
-              })
-            }
-          >
-            <option value="">Todos os tipos</option>
-            <option value="INCOME">Receitas</option>
-            <option value="EXPENSE">Despesas</option>
-          </Select>
+        <FormField label="Buscar lançamento">
+          <Input
+            type="search"
+            value={search}
+            maxLength={200}
+            placeholder="Descrição"
+            onChange={(e) => filter(() => setSearch(e.target.value))}
+          />
         </FormField>
         <FormField label="Filtrar status">
           <Select
+            aria-label="Filtrar status"
             value={status}
             onChange={(e) => filter(() => setStatus(e.target.value))}
           >
@@ -547,6 +579,7 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
         </FormField>
         <FormField label="Filtrar conta">
           <Select
+            aria-label="Filtrar conta"
             value={accountId}
             onChange={(e) => filter(() => setAccount(e.target.value))}
           >
@@ -560,17 +593,16 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
         </FormField>
         <FormField label="Filtrar categoria">
           <Select
+            aria-label="Filtrar categoria"
             value={categoryId}
             onChange={(e) => filter(() => setCategory(e.target.value))}
           >
             <option value="">Todas as categorias</option>
-            {data?.categories
-              .filter((c) => !type || c.type === type)
-              .map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
+            {data?.categories.map((c) => (
+              <option value={c.id} key={c.id}>
+                {c.name}
+              </option>
+            ))}
           </Select>
         </FormField>
       </div>
@@ -586,170 +618,59 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
       ) : (
         <>
           <div className="monthly-summary" aria-label="Resumo mensal">
-            {(
-              [
-                ['income', 'Receitas'],
-                ['expense', 'Despesas'],
-              ] as const
-            ).flatMap(([key, label]) =>
-              (['expected', 'realized'] as const).map((field) => (
-                <Card key={key + field}>
-                  <span>
-                    {label} {field === 'expected' ? 'previstas' : 'realizadas'}
-                  </span>
-                  <strong>{formatMoney(data.summary[key][field])}</strong>
-                </Card>
-              )),
-            )}
+            {(['income', 'expense'] as const).map((key) => (
+              <Card key={key}>
+                <span>
+                  {key === 'income'
+                    ? 'Receitas previstas'
+                    : 'Despesas previstas'}
+                </span>
+                <strong>{formatMoney(data.view.summary[key].expected)}</strong>
+                <small>
+                  Realizado {formatMoney(data.view.summary[key].realized)}
+                </small>
+              </Card>
+            ))}
+            <Card>
+              <span>Resultado previsto</span>
+              <strong>
+                {formatMoney(
+                  moneyDifference(
+                    data.view.summary.income.expected,
+                    data.view.summary.expense.expected,
+                  ),
+                )}
+              </strong>
+              <small>
+                Realizado{' '}
+                {formatMoney(
+                  moneyDifference(
+                    data.view.summary.income.realized,
+                    data.view.summary.expense.realized,
+                  ),
+                )}
+              </small>
+            </Card>
           </div>
           <p className="form-note">
-            Resumo de todo o mês, sem os filtros da lista. Realizados incluem
-            somente lançamentos pagos ou recebidos.
+            {search || status || accountId || categoryId
+              ? 'Resumo e subtotais dos lançamentos filtrados neste mês.'
+              : 'Resumo de todo o mês.'}{' '}
+            Realizados incluem somente lançamentos pagos ou recebidos.
           </p>
-          {!data.rows.length ? (
+          {!data.view.rows.length && (
             <Card>
               <EmptyState
                 title="Nenhum lançamento neste mês."
                 description="Crie uma receita ou despesa, ou ajuste os filtros."
               />
             </Card>
-          ) : (
-            <div className="transactions-list">
-              {data.rows.map((row) => (
-                <Card
-                  key={row.id}
-                  className={row.status === 'CANCELLED' ? 'muted-card' : ''}
-                >
-                  <div className="transaction-heading">
-                    <div>
-                      <span className={'transaction-type ' + row.type}>
-                        {row.type === 'INCOME' ? '↓ Receita' : '↑ Despesa'}
-                      </span>
-                      <h2>{row.description}</h2>
-                    </div>
-                    <span className={'badge status-' + row.status}>
-                      {row.status === 'PAID' && row.type === 'INCOME'
-                        ? 'Recebido'
-                        : statuses[row.status]}
-                    </span>
-                  </div>
-                  <p>
-                    {row.category?.name ?? 'Sem categoria'} ·{' '}
-                    {row.creditCard
-                      ? `Cartão ${row.creditCard.name}`
-                      : (row.account?.name ?? 'Sem conta')}
-                  </p>
-                  <p>
-                    Vencimento:{' '}
-                    <time dateTime={row.dueDate}>
-                      {formatDate(row.dueDate)}
-                    </time>
-                  </p>
-                  <div className="transaction-values">
-                    <span>
-                      Previsto{' '}
-                      <strong>
-                        {row.expectedAmount
-                          ? formatMoney(row.expectedAmount)
-                          : 'Não informado'}
-                      </strong>
-                    </span>
-                    <span>
-                      {row.status === 'PAID'
-                        ? row.type === 'INCOME'
-                          ? 'Recebido'
-                          : 'Pago'
-                        : 'Valor realizado conhecido'}{' '}
-                      <strong>
-                        {row.amount ? formatMoney(row.amount) : 'Não informado'}
-                      </strong>
-                    </span>
-                    {row.amount &&
-                      row.expectedAmount &&
-                      row.amount !== row.expectedAmount && (
-                        <span>
-                          Diferença{' '}
-                          <strong>
-                            {formatMoney(
-                              moneyDifference(row.amount, row.expectedAmount),
-                            )}
-                          </strong>
-                        </span>
-                      )}
-                  </div>
-                  {row.recurrenceId && (
-                    <Link
-                      className="button button-secondary"
-                      to={`/app/recurrences/${row.recurrenceId}`}
-                    >
-                      Recorrente · Ver recorrência
-                    </Link>
-                  )}
-                  {row.installmentGroupId && (
-                    <Link
-                      className="button button-secondary"
-                      to={`/app/installment-groups/${row.installmentGroupId}`}
-                    >
-                      Ver parcelamento {row.installmentNumber}/
-                      {row.installmentGroup?.installmentCount}
-                    </Link>
-                  )}
-                  {row.creditCardId && row.invoiceId && (
-                    <Link
-                      className="button button-secondary"
-                      to={`/app/credit-cards/${row.creditCardId}/invoices/${row.invoiceId}`}
-                    >
-                      Fatura {monthLabel(row.competenceDate.slice(0, 7))}
-                    </Link>
-                  )}
-                  {writable &&
-                    !row.creditCardId &&
-                    row.status !== 'CANCELLED' && (
-                      <div className="card-actions">
-                        {row.status === 'PAID' ? (
-                          <Button
-                            variant="quiet"
-                            onClick={() => setEditor({ kind: 'reopen', row })}
-                          >
-                            Reabrir
-                          </Button>
-                        ) : (
-                          <>
-                            {!row.installmentGroupId && (
-                              <Button
-                                variant="quiet"
-                                onClick={() =>
-                                  setEditor({
-                                    kind: 'edit',
-                                    row,
-                                    type: row.type,
-                                  })
-                                }
-                              >
-                                Editar
-                              </Button>
-                            )}
-                            <Button
-                              variant="quiet"
-                              onClick={() => setEditor({ kind: 'cancel', row })}
-                            >
-                              {row.installmentGroupId
-                                ? 'Cancelar parcela'
-                                : 'Cancelar lançamento'}
-                            </Button>
-                            <Button
-                              onClick={() => setEditor({ kind: 'pay', row })}
-                            >
-                              {row.type === 'INCOME' ? 'Receber' : 'Pagar'}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                </Card>
-              ))}
-            </div>
           )}
+          <TransactionTables
+            view={data.view}
+            writable={writable}
+            edit={setEditor}
+          />
         </>
       )}
       {editor && data && (

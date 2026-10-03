@@ -359,3 +359,10 @@ export const endRecurrenceSchema = z
 export type CreateRecurrence = z.infer<typeof createRecurrenceSchema>;
 export type UpdateRecurrence = z.infer<typeof updateRecurrenceSchema>;
 export type RecurrencePreviewInput = z.infer<typeof recurrencePreviewSchema>;
+
+export const transactionMonthViewSchema = transactionListSchema.extend({
+  month: monthSchema,
+});
+export const permanentlyDeleteTransactionSchema = z
+  .object({ confirm: z.literal(true) })
+  .strict();

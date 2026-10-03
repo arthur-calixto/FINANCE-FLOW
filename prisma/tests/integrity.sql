@@ -197,7 +197,12 @@ BEGIN
   PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceRevision" SET "expectedAmount" = ''NaN'' WHERE id = %L', revision_id), '23514');
   UPDATE "Transaction" SET "recurrenceDate" = '2026-10-10' WHERE id = second_transaction;
   PERFORM pg_temp.expect_error(format('UPDATE "Transaction" SET "recurrenceId" = %L, "recurrenceDate" = ''2026-10-10'' WHERE id = %L', recurrences[1], transactions[1]), '23505');
-  RAISE NOTICE 'OK: 12 models exercitados; isolamento, unicidade, datas, Decimal, CHECKs, Transfer.updatedAt e exclusões validados';
+  INSERT INTO "RecurrenceOccurrenceExclusion" ("workspaceId", "recurrenceId", "recurrenceDate") VALUES (ws[1], recurrences[1], '2027-05-10');
+  PERFORM pg_temp.expect_error(format('INSERT INTO "RecurrenceOccurrenceExclusion" ("workspaceId", "recurrenceId", "recurrenceDate") VALUES (%L, %L, ''2027-05-10'')', ws[1], recurrences[1]), '23505');
+  PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceOccurrenceExclusion" SET "workspaceId" = %L WHERE "recurrenceId" = %L', ws[2], recurrences[1]), '23503');
+  PERFORM pg_temp.expect_error(format('UPDATE "InstallmentGroup" SET "startingInstallment" = 0 WHERE id = %L', groups[1]), '23514');
+  PERFORM pg_temp.expect_error(format('UPDATE "InstallmentGroup" SET "startingInstallment" = "installmentCount" + 1 WHERE id = %L', groups[1]), '23514');
+  RAISE NOTICE 'OK: 13 models exercitados; isolamento, unicidade, datas, Decimal, CHECKs, Transfer.updatedAt e exclusões validados';
 END;
 $$;
 ROLLBACK;

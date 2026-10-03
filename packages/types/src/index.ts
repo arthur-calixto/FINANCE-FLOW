@@ -54,7 +54,13 @@ export interface TransactionRecord {
   creditCardId?: string | null;
   invoiceId?: string | null;
   creditCard?: { id: string; name: string } | null;
-  invoice?: { id: string; referenceMonth: string } | null;
+  invoice?: {
+    id: string;
+    referenceMonth: string;
+    dueDate?: string;
+    status?: InvoiceRecord['status'];
+  } | null;
+  permanentDeleteBlockedReason?: string | null;
   id: string;
   workspaceId: string;
   description: string;
@@ -196,4 +202,23 @@ export interface RecurrenceDetail extends RecurrenceRecord {
     expectedAmount: string;
     description: string;
   }[];
+}
+
+export interface TransactionTotals {
+  expected: string;
+  realized: string;
+}
+export interface TransactionMonthView {
+  rows: TransactionRecord[];
+  summary: TransactionSummary;
+  subtotals: Record<string, TransactionTotals>;
+}
+/** Origem real; parcelamento não é uma seção financeira separada. */
+export function transactionGroupKey(
+  row: Pick<TransactionRecord, 'type' | 'recurrenceId' | 'creditCardId'>,
+): string {
+  if (row.type === 'INCOME')
+    return row.recurrenceId ? 'incomeFixed' : 'incomeOther';
+  if (row.creditCardId) return 'card:' + row.creditCardId;
+  return row.recurrenceId ? 'expenseFixed' : 'expenseOther';
 }

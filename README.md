@@ -110,3 +110,7 @@ Receitas/despesas e compras no cartão oferecem Pagamento → Parcelado, com pr�
 ## Recorrências e fixos (FIN-8)
 
 Receitas/despesas mensais e anuais com janela móvel de 12 meses, prévia, edição individual ou futura e encerramento preservando histórico. A migration `20260929223000_recurrences` é aditiva; aplique com `pnpm db:migrate`. Não execute reset. Contratos, decisões e limitações em [docs/recurrences.md](docs/recurrences.md).
+
+## Visão mensal e exclusão definitiva — FIN-9
+
+Lançamentos agrupados por receitas/despesas, recorrentes, cartões e outros, com subtotais e resultado previsto/realizado. Cancelar mantém histórico; excluir definitivamente remove o registro mediante confirmação e regras de integridade. Aplique a migration aditiva `20260930122000_transaction_deletion` com `pnpm db:migrate`, sem reset. Contratos, tombstones de recorrência, proteção de faturas pagas e validação em [docs/transactions-view.md](docs/transactions-view.md). Dashboard permanece na FIN-10.

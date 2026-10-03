@@ -5,7 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { brazilToday } from '@finance-flow/types';
+import { transactionTotals } from './transaction-totals';
+import { brazilToday, transactionGroupKey } from '@finance-flow/types';
 import type {
   CreateTransaction,
   UpdateTransaction,
@@ -20,7 +21,9 @@ const civil = (v: Date) => v.toISOString().slice(0, 10);
 const relations = {
   installmentGroup: { select: { id: true, installmentCount: true } },
   creditCard: { select: { id: true, name: true } },
-  invoice: { select: { id: true, referenceMonth: true } },
+  invoice: {
+    select: { id: true, referenceMonth: true, dueDate: true, status: true },
+  },
   account: { select: { id: true, name: true } },
   category: { select: { id: true, name: true } },
 } as const;
@@ -34,9 +37,17 @@ export class TransactionsService {
     private readonly prisma: PrismaService,
     private readonly recurrences: RecurrencesService,
   ) {}
-  private present<T extends Transaction>(row: T, today = brazilToday()) {
+  private present<
+    T extends Transaction & { invoice?: { status: string } | null },
+  >(row: T, today = brazilToday()) {
     return {
       ...row,
+      permanentDeleteBlockedReason:
+        row.invoice?.status === 'PAID'
+          ? 'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente.'
+          : row.creditCardId && row.installmentGroupId
+            ? 'Parcelas de cartão não podem ser excluídas individualmente. Preserve o compromisso original do parcelamento.'
+            : null,
       status:
         row.status === 'PENDING' || row.status === 'OVERDUE'
           ? civil(row.dueDate) < today
@@ -80,7 +91,7 @@ export class TransactionsService {
       await this.prisma.client.transaction.findMany({
         where: this.where(workspaceId, q),
         include: relations,
-        orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
+        orderBy: [{ dueDate: 'asc' }, { description: 'asc' }, { id: 'asc' }],
       })
     ).map((r) => this.present(r));
   }
@@ -105,31 +116,105 @@ export class TransactionsService {
       },
       _sum: { expectedAmount: true, amount: true },
     });
-    const sums = {
-      income: {
-        expected: new Prisma.Decimal(0),
-        realized: new Prisma.Decimal(0),
-      },
-      expense: {
-        expected: new Prisma.Decimal(0),
-        realized: new Prisma.Decimal(0),
-      },
+    const rows = groups.map((g) => ({ ...g, ...g._sum }));
+    return {
+      income: transactionTotals(rows.filter((r) => r.type === 'INCOME')),
+      expense: transactionTotals(rows.filter((r) => r.type === 'EXPENSE')),
     };
-    for (const g of groups) {
-      const s = sums[g.type === 'INCOME' ? 'income' : 'expense'];
-      s.expected = s.expected.plus(g._sum.expectedAmount ?? 0);
-      if (g.status === 'PAID') s.realized = s.realized.plus(g._sum.amount ?? 0);
+  }
+  async monthView(workspaceId: string, q: TransactionQuery) {
+    await this.recurrences.ensureRecurrenceHorizon(workspaceId);
+    // Uma leitura inclui todos os relacionamentos; totais vêm do mesmo conjunto.
+    const rows = await this.prisma.client.$transaction(
+      (tx) =>
+        tx.transaction.findMany({
+          where: this.where(workspaceId, q),
+          include: relations,
+          orderBy: [{ dueDate: 'asc' }, { description: 'asc' }, { id: 'asc' }],
+        }),
+      { isolationLevel: 'RepeatableRead' },
+    );
+    const grouped = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = transactionGroupKey(row);
+      const group = grouped.get(key) ?? [];
+      group.push(row);
+      grouped.set(key, group);
     }
     return {
-      income: {
-        expected: sums.income.expected.toFixed(2),
-        realized: sums.income.realized.toFixed(2),
+      rows: rows.map((r) => this.present(r)),
+      summary: {
+        income: transactionTotals(rows.filter((r) => r.type === 'INCOME')),
+        expense: transactionTotals(rows.filter((r) => r.type === 'EXPENSE')),
       },
-      expense: {
-        expected: sums.expense.expected.toFixed(2),
-        realized: sums.expense.realized.toFixed(2),
+      subtotals: {
+        ...Object.fromEntries(
+          [...grouped].map(([key, group]) => [key, transactionTotals(group)]),
+        ),
+        cards: transactionTotals(
+          rows.filter((r) => r.type === 'EXPENSE' && r.creditCardId),
+        ),
       },
     };
+  }
+  permanentlyDelete(workspaceId: string, id: string) {
+    return databaseOperation(() =>
+      this.prisma.client.$transaction(async (tx) => {
+        // Mesma ordem de locks usada por baixas, materializador e pagamento de fatura.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'categories:' + workspaceId}, 0))::text`;
+        const row = await tx.transaction.findFirst({
+          where: { workspaceId, id },
+          include: { invoice: true },
+        });
+        if (!row) throw new NotFoundException('Lançamento não encontrado.');
+        if (row.creditCardId)
+          await tx.$queryRaw`SELECT id FROM "CreditCard" WHERE id=${row.creditCardId}::uuid AND "workspaceId"=${workspaceId}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "Transaction" WHERE id=${id}::uuid AND "workspaceId"=${workspaceId}::uuid FOR UPDATE`;
+        if (row.invoice?.status === 'PAID')
+          throw new ConflictException(
+            'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente.',
+          );
+        if (row.creditCardId && row.installmentGroupId)
+          throw new ConflictException(
+            'Parcelas de cartão não podem ser excluídas individualmente. Preserve o compromisso original do parcelamento.',
+          );
+        if (row.recurrenceId) {
+          if (!row.recurrenceDate)
+            throw new ConflictException(
+              'Ocorrência sem identidade original; exclusão bloqueada.',
+            );
+          await tx.recurrenceOccurrenceExclusion.create({
+            data: {
+              workspaceId,
+              recurrenceId: row.recurrenceId,
+              recurrenceDate: row.recurrenceDate,
+            },
+          });
+        }
+        await tx.transaction.delete({ where: { id, workspaceId } });
+        if (row.invoiceId)
+          await tx.creditCardInvoice.deleteMany({
+            where: {
+              id: row.invoiceId,
+              workspaceId,
+              status: { not: 'PAID' },
+              paidAt: null,
+              paidAmount: null,
+              paymentAccountId: null,
+              transactions: { none: {} },
+            },
+          });
+        if (row.installmentGroupId)
+          await tx.installmentGroup.deleteMany({
+            where: {
+              id: row.installmentGroupId,
+              workspaceId,
+              transactions: { none: {} },
+            },
+          });
+        return { id, deleted: true };
+      }),
+    );
   }
   private async validateLinks(
     tx: Prisma.TransactionClient,

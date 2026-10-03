@@ -1,3 +1,4 @@
+import { monthViewFixture } from '../../test/month-view';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import {
   cleanup,
@@ -133,13 +134,8 @@ beforeEach(() => {
           availableAfter: '4000.00',
         };
       if (path === '/installments/preview') return plan;
-      if (path.startsWith('/transactions/summary'))
-        return {
-          income: { expected: '0.00', realized: '0.00' },
-          expense: { expected: '0.00', realized: '0.00' },
-        };
-      if (path.startsWith('/transactions?'))
-        return rows.filter((r) => r.workspaceId === ws);
+      if (path.startsWith('/transactions/month-view'))
+        return monthViewFixture(rows.filter((r) => r.workspaceId === ws));
       if (path.includes('purchase-preview'))
         return {
           referenceMonth: '2026-11-01',

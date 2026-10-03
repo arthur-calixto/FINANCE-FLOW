@@ -150,3 +150,7 @@ Limitações deliberadas: sem reabertura de fatura, sem edição de compra (canc
 ## Evolução na Task 07
 
 Compras parceladas usam as mesmas faturas, locks, pagamento e cálculo de limite. Todas as parcelas futuras são geradas juntas; cancelamento passa a ser por grupo e somente antes de qualquer parcela paga. A rota de cancelamento de compra simples continua rejeitando parcelas. Veja [parcelamentos](installments.md).
+
+## Exclusão definitiva — FIN-9
+
+A visão mensal oferece `DELETE /transactions/:id/permanent` com confirmação para compra simples em fatura não paga. Remove a Transaction; total/limite/resumo são derivados novamente. Remove fatura completamente vazia apenas se não paga e sem metadados de pagamento. Fatura paga nunca é removida, e suas compras bloqueiam hard delete. Parcela de cartão bloqueia exclusão individual para preservar as regras do grupo. Cancelamentos e pagamentos existentes não mudam. Detalhes e testes em [FIN-9](transactions-view.md).

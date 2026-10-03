@@ -1,3 +1,4 @@
+import { monthViewFixture } from '../../test/month-view';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import {
   cleanup,
@@ -133,18 +134,14 @@ beforeEach(() => {
         }
         return structuredClone(detail);
       }
-      if (path.startsWith('/transactions/summary'))
-        return {
-          income: { expected: '0', realized: '0' },
-          expense: { expected: '120', realized: '0' },
-        };
-      if (path.startsWith('/transactions?')) return [detail.occurrences[0]];
+      if (path.startsWith('/transactions/month-view'))
+        return monthViewFixture([detail.occurrences[0]]);
       if (path.endsWith('/pay')) {
         detail.occurrences[0].status = 'PAID';
         detail.occurrences[0].amount = String(options?.body.amount);
         return detail.occurrences[0];
       }
-      if (path.startsWith('/transactions/') && options?.method === 'DELETE') {
+      if (path.endsWith('/cancel') && options?.method === 'POST') {
         detail.occurrences[0].status = 'CANCELLED';
         return detail.occurrences[0];
       }
@@ -316,7 +313,7 @@ it('baixa com diferença preserva valor previsto e cancelamento é individual', 
   );
   expect(
     mocks.request.mock.calls.some(
-      (c) => c[0].startsWith('/transactions/') && c[3]?.method === 'DELETE',
+      (c) => c[0].endsWith('/cancel') && c[3]?.method === 'POST',
     ),
   ).toBe(true);
   expect(
@@ -363,6 +360,7 @@ it('lançamentos identificam recorrência e oferecem escolha apenas na edição 
   render(app('/app/transactions'));
   const user = userEvent.setup();
   await screen.findByRole('link', { name: 'Recorrente · Ver recorrência' });
+  await user.click(screen.getByLabelText('Ações de Internet'));
   await user.click(screen.getByRole('button', { name: 'Editar' }));
   await screen.findByLabelText('Como deseja aplicar esta alteração?');
 });

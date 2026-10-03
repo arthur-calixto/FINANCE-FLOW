@@ -940,3 +940,228 @@ dialog::backdrop {
 .transactions-list .card-actions {
   flex-wrap: wrap;
 }
+
+/* Visão mensal: tabelas no desktop e registros legíveis em telas menores. */
+.monthly-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.monthly-summary small {
+  display: block;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+.transaction-sections {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+.transaction-group {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface, #fff);
+}
+.transaction-group > summary {
+  cursor: pointer;
+  padding: 0.9rem 1rem;
+  font-weight: 650;
+}
+.transaction-group > summary > span:first-of-type {
+  margin-left: 0.35rem;
+}
+.group-total {
+  float: right;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.group-total small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.transaction-group > summary::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+.group-content {
+  padding: 0.5rem 0.8rem 0.8rem;
+  min-width: 0;
+}
+.group-content > .transaction-group + .transaction-group {
+  margin-top: 0.65rem;
+}
+.group-empty {
+  margin: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.income-section > summary {
+  color: #18664b;
+}
+.expense-section > summary {
+  color: #893c34;
+}
+.transaction-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  table-layout: fixed;
+}
+.transaction-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 0.65rem 0.45rem;
+  font-size: 0.75rem;
+}
+.transaction-table th:first-child {
+  width: 23%;
+}
+.transaction-table th:last-child {
+  width: 15%;
+}
+.transaction-table td {
+  padding: 0.85rem 0.45rem;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.transaction-description h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.88rem;
+}
+.transaction-description small,
+.transaction-description a,
+.transaction-value small {
+  display: block;
+  font-size: 0.74rem;
+  margin-top: 0.25rem;
+}
+.transaction-value {
+  font-variant-numeric: tabular-nums;
+}
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+.row-actions > .button {
+  padding: 0.4rem 0.55rem;
+  font-size: 0.8rem;
+}
+.row-menu {
+  position: relative;
+}
+.row-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  font-size: 1.2rem;
+  border-radius: 0.3rem;
+}
+.row-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.row-menu > summary:focus-visible {
+  outline: 2px solid #237960;
+}
+.row-menu[open] > div {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 240px;
+  padding: 0.5rem;
+  background: white;
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px #162d2426;
+  border-radius: 0.5rem;
+  z-index: 5;
+  display: grid;
+  gap: 0.4rem;
+}
+.row-menu a {
+  padding: 0.4rem;
+}
+.invoice-context {
+  display: flex;
+  gap: 0.5rem 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+.delete-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 1.4rem 0;
+}
+.delete-confirmation input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+@media (max-width: 1150px) {
+  .transaction-table thead {
+    display: none;
+  }
+  .transaction-table,
+  .transaction-table tbody {
+    display: block;
+  }
+  .transaction-table tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--border);
+    padding: 0.6rem 0;
+  }
+  .transaction-table td {
+    border: 0;
+    padding: 0.45rem;
+  }
+  .transaction-table td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.72rem;
+    margin-bottom: 0.25rem;
+  }
+  .transaction-table .transaction-description {
+    grid-column: 1 / -1;
+  }
+  .transaction-table .transaction-description::before {
+    display: none;
+  }
+  .transaction-table td:last-child {
+    grid-column: 1 / -1;
+  }
+  .row-menu[open] > div {
+    left: 0;
+    right: auto;
+  }
+}
+@media (max-width: 600px) {
+  .monthly-summary {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .monthly-summary .card {
+    padding: 0.8rem;
+  }
+  .transaction-table tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .transaction-group > summary {
+    padding: 0.7rem 0.5rem;
+    font-size: 0.86rem;
+  }
+  .group-content {
+    padding: 0.35rem;
+  }
+  .group-total {
+    font-size: 0.85rem;
+  }
+  .group-total small {
+    font-size: 0.63rem;
+  }
+}

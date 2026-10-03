@@ -21,6 +21,7 @@ import {
   commonInstallmentPlan,
   cardInstallmentPlan,
   installmentTotal,
+  splitInstallments,
 } from './installment-plan';
 const Money = Prisma.Decimal.clone({ precision: 40 });
 @Injectable()
@@ -97,6 +98,7 @@ export class InstallmentsService {
             description: data.description,
             totalAmount: plan.totalAmount,
             installmentCount: data.installmentCount,
+            startingInstallment: plan.startingInstallment,
             purchaseDate: asDate(data.transactionDate),
             accountId: data.accountId,
             categoryId: data.categoryId,
@@ -159,6 +161,7 @@ export class InstallmentsService {
           description: data.description,
           totalAmount: plan.totalAmount,
           installmentCount: data.installmentCount,
+          startingInstallment: plan.startingInstallment,
           purchaseDate: asDate(
             data.transactionDate ?? data.firstInvoiceMonth! + '-01',
           ),
@@ -243,14 +246,16 @@ export class InstallmentsService {
     return {
       ...record,
       totalAmount: group.totalAmount.toFixed(2),
-      startingInstallment: transactions[0]?.installmentNumber ?? 1,
-      previousInstallmentCount: (transactions[0]?.installmentNumber ?? 1) - 1,
-      controlledInstallmentCount: transactions.length,
-      controlledAmount: transactions
-        .reduce(
-          (sum, row) => sum.plus(row.expectedAmount?.toString() ?? '0'),
-          new Money(0),
-        )
+      startingInstallment: group.startingInstallment,
+      previousInstallmentCount: group.startingInstallment - 1,
+      controlledInstallmentCount:
+        group.installmentCount - group.startingInstallment + 1,
+      controlledAmount: splitInstallments(
+        group.totalAmount.toFixed(2),
+        group.installmentCount,
+      )
+        .slice(group.startingInstallment - 1)
+        .reduce((sum, amount) => sum.plus(amount), new Money(0))
         .toFixed(2),
       purchaseDate: civil(group.purchaseDate),
       type: transactions[0]?.type ?? 'EXPENSE',

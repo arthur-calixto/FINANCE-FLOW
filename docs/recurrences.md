@@ -57,7 +57,7 @@ O detalhe/listagem apresenta os defaults da regra correspondente à próxima oco
 
 Baixa/recebimento usa os endpoints FIN-5. Pagar 126.90 para previsto 120 preserva expectedAmount 120 e a regra 120; somente a Transaction recebe amount/paidAt/PAID. O resumo soma Transactions materializadas, nunca a Recurrence. Não duplica receitas/despesas.
 
-Cancelar somente um lançamento usa DELETE /transactions/:id. Cancela a ocorrência sem interromper a série; a chave original permanece e impede recriação. CANCELLED não é reativado pelo materializador.
+Cancelar somente um lançamento usa POST /transactions/:id/cancel (DELETE /transactions/:id permanece como alias legado). Cancela a ocorrência sem interromper a série; a chave original permanece e impede recriação. CANCELLED não é reativado pelo materializador.
 
 Encerrar usa DELETE /recurrences/:id com **fromDate explícita**. `endDate` é corte exclusivo de geração: ocorrências com recurrenceDate >= fromDate não são mais geradas e pendentes já existentes nessa faixa viram CANCELLED. Antes do corte, histórico permanece. PAID é sempre preservado, inclusive depois do corte. Reabrir uma ocorrência paga situada na faixa encerrada é bloqueado para não restaurar um compromisso encerrado.
 
@@ -159,3 +159,7 @@ Capturas:
 - [Detalhe desktop](screenshots/recurrences-detail-desktop.png), [tablet](screenshots/recurrences-detail-tablet.png), [celular](screenshots/recurrences-detail-mobile.png).
 
 Resultado da suíte: 44 testes API/calendário, 65 Web, 56 integração PostgreSQL e integridade dos 12 modelos. Todos os comandos acima passaram, incluindo regressão das FIN anteriores. Permanecem avisos não bloqueantes de bundle Web acima de 500 kB e depreciação do driver pg em chamadas via Prisma. Não houve commit automático.
+
+## Exclusão individual — FIN-9
+
+A visão mensal permite excluir definitivamente uma ocorrência, inclusive PAID/CANCELLED, mediante confirmação forte. `DELETE /transactions/:id/permanent` remove a Transaction e insere `RecurrenceOccurrenceExclusion` no mesmo commit. O materializador ignora a chave original recurrenceId/recurrenceDate, inclusive se o cursor voltar ou o vencimento tiver sido editado. A exclusão técnica não aparece como histórico financeiro e os próximos meses continuam normais. Não existe hard delete da série inteira. Detalhes em [FIN-9](transactions-view.md).

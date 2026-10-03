@@ -17,6 +17,8 @@ import {
   payTransactionSchema,
   transactionListSchema,
   transactionSummarySchema,
+  transactionMonthViewSchema,
+  permanentlyDeleteTransactionSchema,
   z,
 } from '@finance-flow/validation';
 import type {
@@ -47,6 +49,27 @@ export class TransactionsController {
     @Query(new SchemaPipe(transactionSummarySchema)) query: { month: string },
   ) {
     return this.service.summary(ws.id, query.month);
+  }
+  @Get('month-view') monthView(
+    @CurrentWorkspace() ws: WorkspaceSummary,
+    @Query(new SchemaPipe(transactionMonthViewSchema)) query: TransactionQuery,
+  ) {
+    return this.service.monthView(ws.id, query);
+  }
+  @Delete(':id/permanent') @UseGuards(WriteGuard) permanentlyDelete(
+    @CurrentWorkspace() ws: WorkspaceSummary,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body(new SchemaPipe(permanentlyDeleteTransactionSchema))
+    _data: { confirm: true },
+  ) {
+    void _data;
+    return this.service.permanentlyDelete(ws.id, id);
+  }
+  @Post(':id/cancel') @HttpCode(200) @UseGuards(WriteGuard) cancelExplicit(
+    @CurrentWorkspace() ws: WorkspaceSummary,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.service.cancel(ws.id, id);
   }
   @Get(':id') get(
     @CurrentWorkspace() ws: WorkspaceSummary,

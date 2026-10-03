@@ -187,16 +187,16 @@ Gera 5/10 em outubro/2026 até 10/10 em março/2027. A prévia do cartão recebe
 
 **Data técnica no retroativo do cartão:** como purchaseDate e transactionDate existentes são obrigatórios no schema, quando a API não recebe data histórica, usa o primeiro dia de firstInvoiceMonth. Essa data representa o início do controle, não uma inferência da compra original. Se a data histórica for fornecida, será preservada. Competência, vencimento e limite não dependem desse preenchimento.
 
-Não há migration, reset nem campos redundantes. `InstallmentGroup.totalAmount` e `installmentCount` guardam total e quantidade originais. A criação atômica garante uma sequência contínua startingInstallment..installmentCount. Como parcelas não são excluídas fisicamente e expectedAmount/numeração não são editáveis, o detalhe deriva com segurança:
+Não há migration, reset nem campos redundantes. `InstallmentGroup.totalAmount` e `installmentCount` guardam total e quantidade originais. A criação atômica garante uma sequência contínua startingInstallment..installmentCount. A FIN-9 passou a permitir exclusão individual comum. Para preservar os metadados originais, startingInstallment é persistido e o detalhe recompõe o plano original:
 
-| Campo                      | Significado                                                |
-| -------------------------- | ---------------------------------------------------------- |
-| totalAmount                | Valor original, incluindo parcelas anteriores ao controle  |
-| installmentCount           | Quantidade original                                        |
-| startingInstallment        | Menor installmentNumber persistido                         |
-| previousInstallmentCount   | startingInstallment − 1                                    |
-| controlledInstallmentCount | Quantidade materializada, incluindo pagas/canceladas       |
-| controlledAmount           | Soma de expectedAmount de todas as parcelas materializadas |
+| Campo                      | Significado                                               |
+| -------------------------- | --------------------------------------------------------- |
+| totalAmount                | Valor original, incluindo parcelas anteriores ao controle |
+| installmentCount           | Quantidade original                                       |
+| startingInstallment        | Parcela inicial persistida na criação (backfill na FIN-9) |
+| previousInstallmentCount   | startingInstallment − 1                                   |
+| controlledInstallmentCount | Quantidade inicialmente controlada: count − start + 1     |
+| controlledAmount           | Soma do plano original a partir de startingInstallment    |
 
 A prévia retorna os mesmos campos calculados do plano. `controlledAmount` é o **valor controlado inicialmente**, não um saldo dinâmico em aberto: não diminui com baixas, diferenças de valor realizado ou cancelamentos. O detalhe usa esse rótulo explicitamente. O modo de entrada não precisa ser persistido: o plano e os valores originais estão preservados.
 
@@ -224,3 +224,9 @@ Capturas da prévia e do detalhe em desktop (1440), tablet (768) e celular (390)
 A limitação anterior de idempotência HTTP permanece. Nenhuma recorrência ou mudança na FIN-8 foi incluída.
 
 Resultado final do complemento: `pnpm lint`, `pnpm build`, `pnpm test`, `pnpm format:check`, `pnpm db:validate`, `pnpm test:database` e `pnpm db:test` aprovados. Foram 40 testes API/calendário, 55 Web e 47 de integração PostgreSQL, além do script de integridade dos 11 modelos. A regressão Chromium dos cenários anteriores (comum novo, cartão novo e pagamento de fatura) também passou nos três viewports, sem erros de console. Permanecem os avisos não bloqueantes de bundle e driver descritos acima.
+
+## Exclusão definitiva — FIN-9
+
+Em Lançamentos, uma parcela comum pode ser excluída individualmente com confirmação forte, inclusive PAID. As outras não são renumeradas: remover 5/10 preserva 6/10. Total original, início e valor inicialmente controlado permanecem; lista e resumo só contêm Transactions existentes. A última parcela removida também remove o grupo vazio, atomicamente. Não há exclusão em lote.
+
+Parcela de cartão não permite hard delete individual, preservando o compromisso original da compra. Fatura paga sempre bloqueia exclusão. Regras e migration aditiva de startingInstallment em [FIN-9](transactions-view.md).
