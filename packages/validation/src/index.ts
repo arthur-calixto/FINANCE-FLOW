@@ -364,5 +364,13 @@ export const transactionMonthViewSchema = transactionListSchema.extend({
   month: monthSchema,
 });
 export const permanentlyDeleteTransactionSchema = z
-  .object({ confirm: z.literal(true) })
+  .object({
+    confirm: z.literal(true),
+    scope: z.enum(['THIS', 'THIS_AND_FUTURE', 'ALL']).default('THIS'),
+    expectedCount: z.number().int().positive().optional(),
+  })
   .strict();
+
+export type PermanentlyDeleteTransaction = z.infer<
+  typeof permanentlyDeleteTransactionSchema
+>;

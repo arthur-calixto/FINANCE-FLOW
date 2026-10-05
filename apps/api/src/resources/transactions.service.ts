@@ -12,7 +12,9 @@ import type {
   UpdateTransaction,
   PayTransaction,
   TransactionQuery,
+  PermanentlyDeleteTransaction,
 } from '@finance-flow/validation';
+import type { TransactionDeletionScope } from '@finance-flow/types';
 import { Prisma, type Transaction } from '../generated/prisma/client';
 import { PrismaService } from '../prisma.service';
 import { databaseOperation } from './database-errors';
@@ -45,9 +47,7 @@ export class TransactionsService {
       permanentDeleteBlockedReason:
         row.invoice?.status === 'PAID'
           ? 'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente.'
-          : row.creditCardId && row.installmentGroupId
-            ? 'Parcelas de cartão não podem ser excluídas individualmente. Preserve o compromisso original do parcelamento.'
-            : null,
+          : null,
       status:
         row.status === 'PENDING' || row.status === 'OVERDUE'
           ? civil(row.dueDate) < today
@@ -157,26 +157,121 @@ export class TransactionsService {
       },
     };
   }
-  permanentlyDelete(workspaceId: string, id: string) {
+  private async deletionContext(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    id: string,
+  ) {
+    const include = {
+      invoice: true,
+      installmentGroup: { select: { installmentCount: true } },
+    } as const;
+    const selected = await tx.transaction.findFirst({
+      where: { workspaceId, id },
+      include,
+    });
+    if (!selected) throw new NotFoundException('Lançamento não encontrado.');
+    const rows =
+      selected.creditCardId && selected.installmentGroupId
+        ? await tx.transaction.findMany({
+            where: {
+              workspaceId,
+              installmentGroupId: selected.installmentGroupId,
+            },
+            include,
+            orderBy: { installmentNumber: 'asc' },
+          })
+        : [selected];
+    if (
+      selected.creditCardId &&
+      rows.some(
+        (r) =>
+          !r.invoice ||
+          r.creditCardId !== selected.creditCardId ||
+          r.invoice.creditCardId !== selected.creditCardId ||
+          (selected.installmentGroupId && !r.installmentNumber),
+      )
+    )
+      throw new ConflictException(
+        'Parcelamento ou fatura incompatível. Exclusão bloqueada.',
+      );
+    return { selected, rows };
+  }
+  private deletionRows<T extends Transaction>(
+    context: { selected: T; rows: T[] },
+    scope: TransactionDeletionScope,
+  ): T[] {
+    const { selected, rows } = context;
+    if (scope === 'THIS') return [selected];
+    if (!selected.creditCardId || !selected.installmentGroupId)
+      throw new BadRequestException(
+        'Exclusão em lote disponível somente para parcelamento de cartão.',
+      );
+    return scope === 'ALL'
+      ? rows
+      : rows.filter((r) => r.installmentNumber! >= selected.installmentNumber!);
+  }
+  deletionOptions(workspaceId: string, id: string) {
+    return this.prisma.client.$transaction(
+      async (tx) => {
+        const context = await this.deletionContext(tx, workspaceId, id);
+        const scopes: TransactionDeletionScope[] =
+          context.selected.creditCardId && context.selected.installmentGroupId
+            ? ['THIS', 'THIS_AND_FUTURE', 'ALL']
+            : ['THIS'];
+        const options = scopes.flatMap((scope) => {
+          const rows = this.deletionRows(context, scope);
+          if (rows.some((r) => r.invoice?.status === 'PAID')) return [];
+          return [
+            {
+              scope,
+              count: rows.length,
+              firstInstallment: rows[0].installmentNumber,
+              lastInstallment: rows.at(-1)!.installmentNumber,
+            },
+          ];
+        });
+        return {
+          options,
+          installmentCount:
+            context.selected.installmentGroup?.installmentCount ?? null,
+          blockedReason: options.length
+            ? null
+            : 'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente.',
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+  permanentlyDelete(
+    workspaceId: string,
+    id: string,
+    data: PermanentlyDeleteTransaction,
+  ) {
     return databaseOperation(() =>
       this.prisma.client.$transaction(async (tx) => {
-        // Mesma ordem de locks usada por baixas, materializador e pagamento de fatura.
+        // Pagamento de faturas, alterações e exclusões compartilham este lock por workspace.
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'categories:' + workspaceId}, 0))::text`;
-        const row = await tx.transaction.findFirst({
-          where: { workspaceId, id },
-          include: { invoice: true },
-        });
-        if (!row) throw new NotFoundException('Lançamento não encontrado.');
+        const context = await this.deletionContext(tx, workspaceId, id),
+          row = context.selected;
         if (row.creditCardId)
           await tx.$queryRaw`SELECT id FROM "CreditCard" WHERE id=${row.creditCardId}::uuid AND "workspaceId"=${workspaceId}::uuid FOR UPDATE`;
-        await tx.$queryRaw`SELECT id FROM "Transaction" WHERE id=${id}::uuid AND "workspaceId"=${workspaceId}::uuid FOR UPDATE`;
-        if (row.invoice?.status === 'PAID')
+        const rows = this.deletionRows(context, data.scope),
+          ids = rows.map((r) => r.id);
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "Transaction" WHERE "workspaceId"=${workspaceId}::uuid AND id IN (${Prisma.join(ids.map((value) => Prisma.sql`${value}::uuid`))}) ORDER BY id FOR UPDATE`,
+        );
+        // Verificar o conjunto inteiro ANTES de qualquer DELETE, inclusive parcelas futuras pagas.
+        if (rows.some((r) => r.invoice?.status === 'PAID'))
           throw new ConflictException(
-            'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente.',
+            'Esta compra pertence a uma fatura já paga e não pode ser excluída diretamente. Nenhuma parcela foi removida.',
           );
-        if (row.creditCardId && row.installmentGroupId)
+        if (
+          data.expectedCount !== undefined &&
+          data.expectedCount !== rows.length
+        )
           throw new ConflictException(
-            'Parcelas de cartão não podem ser excluídas individualmente. Preserve o compromisso original do parcelamento.',
+            'A quantidade de parcelas mudou. Feche e abra a confirmação novamente.',
           );
         if (row.recurrenceId) {
           if (!row.recurrenceDate)
@@ -191,19 +286,28 @@ export class TransactionsService {
             },
           });
         }
-        await tx.transaction.delete({ where: { id, workspaceId } });
-        if (row.invoiceId)
-          await tx.creditCardInvoice.deleteMany({
-            where: {
-              id: row.invoiceId,
-              workspaceId,
-              status: { not: 'PAID' },
-              paidAt: null,
-              paidAmount: null,
-              paymentAccountId: null,
-              transactions: { none: {} },
-            },
-          });
+        await tx.transaction.deleteMany({
+          where: { workspaceId, id: { in: ids } },
+        });
+        const invoiceIds = [
+          ...new Set(rows.flatMap((r) => (r.invoiceId ? [r.invoiceId] : []))),
+        ];
+        const emptyInvoices = await tx.creditCardInvoice.findMany({
+          where: {
+            id: { in: invoiceIds },
+            workspaceId,
+            status: { not: 'PAID' },
+            paidAt: null,
+            paidAmount: null,
+            paymentAccountId: null,
+            transactions: { none: {} },
+          },
+          select: { id: true },
+        });
+        const deletedInvoiceIds = emptyInvoices.map((i) => i.id);
+        await tx.creditCardInvoice.deleteMany({
+          where: { workspaceId, id: { in: deletedInvoiceIds } },
+        });
         if (row.installmentGroupId)
           await tx.installmentGroup.deleteMany({
             where: {
@@ -212,7 +316,12 @@ export class TransactionsService {
               transactions: { none: {} },
             },
           });
-        return { id, deleted: true };
+        return {
+          id,
+          deleted: true,
+          deletedCount: rows.length,
+          deletedInvoiceIds,
+        };
       }),
     );
   }

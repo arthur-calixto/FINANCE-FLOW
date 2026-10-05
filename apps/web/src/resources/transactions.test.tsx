@@ -102,6 +102,31 @@ beforeEach(() => {
           { id: expense, name: 'Energia', type: 'EXPENSE', isActive: true },
           { id: income, name: 'Salário', type: 'INCOME', isActive: true },
         ];
+      if (path.endsWith('/deletion-options'))
+        return {
+          installmentCount: 10,
+          blockedReason: null,
+          options: [
+            {
+              scope: 'THIS',
+              count: 1,
+              firstInstallment: 5,
+              lastInstallment: 5,
+            },
+            {
+              scope: 'THIS_AND_FUTURE',
+              count: 6,
+              firstInstallment: 5,
+              lastInstallment: 10,
+            },
+            {
+              scope: 'ALL',
+              count: 10,
+              firstInstallment: 1,
+              lastInstallment: 10,
+            },
+          ],
+        };
       if (!options)
         return monthViewFixture(
           rows.filter(
@@ -551,5 +576,46 @@ describe('FIN-9 — hierarquia e exclusão', () => {
     await screen.findByRole('alert');
     expect(rows).toHaveLength(1);
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+it('parcela de cartão na visão agrupada oferece exclusão futura e atualiza a lista', async () => {
+  rows = [
+    fixture({
+      description: 'Notebook 5/10',
+      creditCardId: 'card',
+      creditCard: { id: 'card', name: 'Nubank' },
+      installmentGroupId: 'group',
+      installmentNumber: 5,
+      installmentGroup: { id: 'group', installmentCount: 10 },
+      permanentDeleteBlockedReason: null,
+    }),
+  ];
+  const user = userEvent.setup();
+  render(<Transactions />);
+  await user.click(await screen.findByLabelText('Ações de Notebook 5/10'));
+  await user.click(
+    screen.getByRole('button', { name: 'Excluir definitivamente' }),
+  );
+  await user.selectOptions(
+    await screen.findByLabelText('Como deseja excluir?'),
+    'THIS_AND_FUTURE',
+  );
+  await user.click(
+    screen.getByLabelText('Entendo que a exclusão é definitiva.'),
+  );
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Excluir definitivamente',
+    }),
+  );
+  await screen.findByText('Nenhum lançamento neste mês.');
+  expect(
+    mocks.request.mock.calls.find((c) =>
+      String(c[0]).endsWith('/permanent'),
+    )![3],
+  ).toEqual({
+    method: 'DELETE',
+    body: { confirm: true, scope: 'THIS_AND_FUTURE', expectedCount: 6 },
   });
 });

@@ -1,3 +1,4 @@
+import { PermanentDeletionDialog } from './PermanentDeletionDialog';
 import { RecurrenceEdit } from './RecurrenceEdit';
 import { InstallmentForm } from './InstallmentForm';
 import { TransactionTables } from './TransactionTables';
@@ -43,21 +44,37 @@ const statuses = {
 };
 export type Editor =
   | { kind: 'edit'; row?: TransactionRecord; type: CategoryType }
-  | { kind: 'pay' | 'cancel' | 'reopen' | 'delete'; row: TransactionRecord };
-export function TransactionDialog({
-  editor,
-  accounts,
-  categories,
-  workspaceId,
-  close,
-  saved,
-}: {
+  | { kind: 'pay' | 'cancel' | 'reopen'; row: TransactionRecord }
+  | { kind: 'delete'; row: TransactionRecord };
+type TransactionDialogProps = {
   editor: Editor;
   accounts: AccountRecord[];
   categories: CategoryRecord[];
   workspaceId: string;
   close: () => void;
   saved: () => void;
+};
+export function TransactionDialog(props: TransactionDialogProps) {
+  if (props.editor.kind === 'delete')
+    return (
+      <PermanentDeletionDialog
+        row={props.editor.row}
+        workspaceId={props.workspaceId}
+        close={props.close}
+        saved={props.saved}
+      />
+    );
+  return <TransactionFormDialog {...props} editor={props.editor} />;
+}
+function TransactionFormDialog({
+  editor,
+  accounts,
+  categories,
+  workspaceId,
+  close,
+  saved,
+}: Omit<TransactionDialogProps, 'editor'> & {
+  editor: Exclude<Editor, { kind: 'delete' }>;
 }) {
   const row = editor.row;
   const [installments, setInstallments] = useState(false);
@@ -79,9 +96,7 @@ export function TransactionDialog({
           : 'Pagar despesa'
         : editor.kind === 'reopen'
           ? 'Reabrir lançamento'
-          : editor.kind === 'delete'
-            ? 'Excluir lançamento definitivamente?'
-            : 'Cancelar lançamento';
+          : 'Cancelar lançamento';
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -123,18 +138,14 @@ export function TransactionDialog({
           { method: 'POST', body },
         );
       } else {
-        const action = editor.kind === 'delete' ? 'permanent' : editor.kind;
         await apiRequest(
-          `/transactions/${row!.id}/${action}`,
+          `/transactions/${row!.id}/${editor.kind}`,
           workspaceId,
           undefined,
-          {
-            method: editor.kind === 'delete' ? 'DELETE' : 'POST',
-            body:
-              editor.kind === 'delete' ? { confirm: v.confirm === 'on' } : {},
-          },
+          { method: 'POST', body: {} },
         );
       }
+
       saved();
     } catch (e) {
       setError(
@@ -338,36 +349,6 @@ export function TransactionDialog({
                 />
               </FormField>
             </>
-          ) : editor.kind === 'delete' ? (
-            <>
-              <p>
-                <strong>{row!.description}</strong>
-              </p>
-              <p>
-                Este lançamento será removido permanentemente e não aparecerá
-                mais no histórico ou nos relatórios. Esta ação não pode ser
-                desfeita.
-              </p>
-              {row!.status === 'PAID' && (
-                <p>A baixa também será removida dos totais realizados.</p>
-              )}
-              {row!.recurrenceId && (
-                <p>
-                  Somente esta ocorrência será excluída e não será gerada
-                  novamente. Os próximos meses continuam ativos.
-                </p>
-              )}
-              {row!.installmentGroupId && (
-                <p>
-                  Somente esta parcela será removida. A numeração das demais
-                  será preservada.
-                </p>
-              )}
-              <label className="delete-confirmation">
-                <input type="checkbox" name="confirm" required /> Entendo que a
-                exclusão é definitiva.
-              </label>
-            </>
           ) : (
             <p>
               {editor.kind === 'reopen'
@@ -390,11 +371,7 @@ export function TransactionDialog({
           </Button>
           <Button
             disabled={busy}
-            variant={
-              editor.kind === 'cancel' || editor.kind === 'delete'
-                ? 'danger'
-                : 'primary'
-            }
+            variant={editor.kind === 'cancel' ? 'danger' : 'primary'}
           >
             {busy
               ? 'Salvando…'
@@ -404,9 +381,7 @@ export function TransactionDialog({
                   ? 'Confirmar baixa'
                   : editor.kind === 'reopen'
                     ? 'Reabrir'
-                    : editor.kind === 'delete'
-                      ? 'Excluir definitivamente'
-                      : 'Confirmar cancelamento'}
+                    : 'Confirmar cancelamento'}
           </Button>
         </div>
       </form>

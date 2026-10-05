@@ -1,11 +1,13 @@
+import { PermanentDeletionDialog } from './PermanentDeletionDialog';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import type {
   AccountRecord,
   CreditCardRecord,
   InvoiceRecord,
   InvoiceDetail,
+  TransactionRecord,
 } from '@finance-flow/types';
 import { payInvoiceSchema } from '@finance-flow/validation';
 import { useAuth } from '../auth';
@@ -249,6 +251,10 @@ function InvoiceContent({
   writable: boolean;
   onPaid: () => void;
 }) {
+  const navigate = useNavigate();
+  const [deleteTarget, setDeleteTarget] = useState<TransactionRecord | null>(
+    null,
+  );
   const detail = useCardData<InvoiceDetail>(
     `/credit-cards/${cardId}/invoices/${invoiceId}`,
     ws,
@@ -350,25 +356,72 @@ function InvoiceContent({
                 </Link>
               </p>
             )}
-            {writable &&
-              invoice.status !== 'PAID' &&
-              p.status !== 'CANCELLED' &&
-              !p.installmentGroupId && (
-                <div className="card-actions">
-                  <Button
-                    variant="quiet"
-                    onClick={() => {
-                      setError('');
-                      setTarget(p.id);
-                    }}
-                  >
-                    Cancelar compra
-                  </Button>
-                </div>
-              )}
+            {writable && (
+              <div className="invoice-row-actions">
+                <details className="row-menu">
+                  <summary aria-label={`Ações de ${p.description}`}>⋮</summary>
+                  <div>
+                    {invoice.status === 'PAID' ? (
+                      <p className="form-note">
+                        Esta compra pertence a uma fatura já paga e não pode ser
+                        excluída diretamente.
+                      </p>
+                    ) : (
+                      <>
+                        {p.status !== 'CANCELLED' && !p.installmentGroupId && (
+                          <Button
+                            variant="quiet"
+                            onClick={() => {
+                              setError('');
+                              setTarget(p.id);
+                            }}
+                          >
+                            Cancelar compra
+                          </Button>
+                        )}
+                        <Button
+                          variant="danger"
+                          onClick={() =>
+                            setDeleteTarget({
+                              ...p,
+                              creditCardId: cardId,
+                              invoiceId,
+                            })
+                          }
+                        >
+                          Excluir definitivamente
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </details>
+              </div>
+            )}
           </Card>
         ))}
       </div>
+      {deleteTarget && (
+        <PermanentDeletionDialog
+          key={deleteTarget.id}
+          row={deleteTarget}
+          workspaceId={ws}
+          close={() => setDeleteTarget(null)}
+          saved={(result) => {
+            setDeleteTarget(null);
+            if (result.deletedInvoiceIds.includes(invoiceId))
+              navigate(`/app/credit-cards/${cardId}/invoices`, {
+                replace: true,
+              });
+            else {
+              setSuccess(
+                'Lançamento excluído definitivamente. Faturas e limite atualizados.',
+              );
+              detail.reload();
+              onPaid();
+            }
+          }}
+        />
+      )}
       {pay && (
         <PayInvoiceForm
           ws={ws}

@@ -26,6 +26,7 @@ import type {
   UpdateTransaction,
   PayTransaction,
   TransactionQuery,
+  PermanentlyDeleteTransaction,
 } from '@finance-flow/validation';
 import type { WorkspaceSummary, DomainUser } from '@finance-flow/types';
 import { AuthGuard } from '../auth/auth.guard';
@@ -56,14 +57,19 @@ export class TransactionsController {
   ) {
     return this.service.monthView(ws.id, query);
   }
+  @Get(':id/deletion-options') deletionOptions(
+    @CurrentWorkspace() ws: WorkspaceSummary,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.service.deletionOptions(ws.id, id);
+  }
   @Delete(':id/permanent') @UseGuards(WriteGuard) permanentlyDelete(
     @CurrentWorkspace() ws: WorkspaceSummary,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new SchemaPipe(permanentlyDeleteTransactionSchema))
-    _data: { confirm: true },
+    data: PermanentlyDeleteTransaction,
   ) {
-    void _data;
-    return this.service.permanentlyDelete(ws.id, id);
+    return this.service.permanentlyDelete(ws.id, id, data);
   }
   @Post(':id/cancel') @HttpCode(200) @UseGuards(WriteGuard) cancelExplicit(
     @CurrentWorkspace() ws: WorkspaceSummary,

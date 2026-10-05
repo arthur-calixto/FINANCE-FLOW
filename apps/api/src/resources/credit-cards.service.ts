@@ -304,7 +304,10 @@ export class CreditCardsService {
           invoice = await this.findInvoice(tx, workspaceId, id, invoiceId);
         const purchases = await tx.transaction.findMany({
           where: { workspaceId, creditCardId: id, invoiceId },
-          include: { category: { select: { id: true, name: true } } },
+          include: {
+            category: { select: { id: true, name: true } },
+            installmentGroup: { select: { id: true, installmentCount: true } },
+          },
           orderBy: [{ transactionDate: 'asc' }, { id: 'asc' }],
         });
         const paymentAccount = invoice.paymentAccountId

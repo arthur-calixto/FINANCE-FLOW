@@ -119,6 +119,41 @@ beforeEach(() => {
           closingDate: '2026-10-25',
           dueDate: '2026-11-10',
         };
+      if (path.endsWith('/deletion-options'))
+        return {
+          installmentCount: 10,
+          blockedReason: null,
+          options: [
+            {
+              scope: 'THIS',
+              count: 1,
+              firstInstallment: 5,
+              lastInstallment: 5,
+            },
+            {
+              scope: 'THIS_AND_FUTURE',
+              count: 6,
+              firstInstallment: 5,
+              lastInstallment: 10,
+            },
+          ],
+        };
+      if (path.endsWith('/permanent')) {
+        const id = path.split('/')[2];
+        const affected = invoices.filter((i) =>
+          i.purchases.some((p) => p.id === id),
+        );
+        for (const i of affected) {
+          i.purchases = i.purchases.filter((p) => p.id !== id);
+          i.purchaseCount = i.purchases.length;
+          i.total = i.purchases.length ? '350.00' : '0.00';
+        }
+        const deletedInvoiceIds = affected
+          .filter((i) => !i.purchases.length)
+          .map((i) => i.id);
+        invoices = invoices.filter((i) => !deletedInvoiceIds.includes(i.id));
+        return { id, deleted: true, deletedCount: 1, deletedInvoiceIds };
+      }
       if (!options) {
         if (url.pathname === '/credit-cards')
           return cards
@@ -287,6 +322,7 @@ it('cancelamento preserva compra e recalcula total', async () => {
   invoices = [invoice()];
   const user = userEvent.setup();
   render(app(`/app/credit-cards/${cardId}/invoices/oct`));
+  await user.click(await screen.findByLabelText('Ações de Supermercado'));
   await user.click(
     await screen.findByRole('button', { name: 'Cancelar compra' }),
   );
@@ -339,4 +375,111 @@ it('erro de limite é exibido e preserva formulário', async () => {
     ),
   );
   expect(screen.getByRole('dialog')).toBeTruthy();
+});
+
+it('exclusão direta na fatura atualiza detalhe e histórico sem deixar compra excluída', async () => {
+  cards = [fixture()];
+  invoices = [invoice()];
+  invoices[0].purchases.push({
+    ...invoices[0].purchases[0],
+    id: 'keep',
+    description: 'Manter',
+  });
+  invoices[0].total = '700.00';
+  invoices[0].purchaseCount = 2;
+  const user = userEvent.setup();
+  render(app(`/app/credit-cards/${cardId}/invoices/oct`));
+  await user.click(await screen.findByLabelText('Ações de Supermercado'));
+  await user.click(
+    within(
+      screen.getByLabelText('Ações de Supermercado').closest('details')!,
+    ).getByRole('button', { name: 'Excluir definitivamente' }),
+  );
+  await user.click(
+    screen.getByLabelText('Entendo que a exclusão é definitiva.'),
+  );
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Excluir definitivamente',
+    }),
+  );
+  await screen.findByText('1 compra válida');
+  expect(screen.queryByRole('heading', { name: 'Supermercado' })).toBeNull();
+  expect(screen.getByRole('heading', { name: 'Manter' })).toBeTruthy();
+  expect(
+    screen.getByRole('navigation', { name: 'Histórico de faturas' })
+      .textContent,
+  ).toMatch(/350,00/);
+});
+it('excluir última compra navega para faturas sem consultar detalhe removido', async () => {
+  cards = [fixture()];
+  invoices = [invoice()];
+  const user = userEvent.setup();
+  render(app(`/app/credit-cards/${cardId}/invoices/oct`));
+  await user.click(await screen.findByLabelText('Ações de Supermercado'));
+  await user.click(
+    within(
+      screen.getByLabelText('Ações de Supermercado').closest('details')!,
+    ).getByRole('button', { name: 'Excluir definitivamente' }),
+  );
+  await user.click(
+    screen.getByLabelText('Entendo que a exclusão é definitiva.'),
+  );
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Excluir definitivamente',
+    }),
+  );
+  await screen.findByText('Nenhuma fatura neste período.');
+  expect(
+    screen.queryByRole('heading', { name: 'Fatura outubro de 2026' }),
+  ).toBeNull();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+it('parcela na fatura usa seletor e não oferece ALL se parcialmente paga', async () => {
+  cards = [fixture()];
+  invoices = [invoice()];
+  Object.assign(invoices[0].purchases[0], {
+    installmentGroupId: 'group',
+    installmentNumber: 5,
+    installmentGroup: { id: 'group', installmentCount: 10 },
+  });
+  const user = userEvent.setup();
+  render(app(`/app/credit-cards/${cardId}/invoices/oct`));
+  await user.click(await screen.findByLabelText('Ações de Supermercado'));
+  expect(screen.queryByRole('button', { name: 'Cancelar compra' })).toBeNull();
+  await user.click(
+    within(
+      screen.getByLabelText('Ações de Supermercado').closest('details')!,
+    ).getByRole('button', { name: 'Excluir definitivamente' }),
+  );
+  await user.selectOptions(
+    await screen.findByLabelText('Como deseja excluir?'),
+    'THIS_AND_FUTURE',
+  );
+  expect(
+    screen.queryByRole('option', { name: 'Todo o parcelamento' }),
+  ).toBeNull();
+  expect(
+    screen.getByRole('heading', {
+      name: 'Excluir 6 parcelas definitivamente?',
+    }),
+  ).toBeTruthy();
+});
+it('fatura paga explica bloqueio; VIEWER não recebe menu destrutivo', async () => {
+  cards = [fixture()];
+  invoices = [invoice()];
+  invoices[0].status = 'PAID';
+  const user = userEvent.setup();
+  const view = render(app(`/app/credit-cards/${cardId}/invoices/oct`));
+  await user.click(await screen.findByLabelText('Ações de Supermercado'));
+  expect(screen.getByText(/não pode ser excluída diretamente/)).toBeTruthy();
+  expect(
+    screen.queryByRole('button', { name: 'Excluir definitivamente' }),
+  ).toBeNull();
+  view.unmount();
+  mocks.role = 'VIEWER';
+  render(app(`/app/credit-cards/${cardId}/invoices/oct`));
+  await screen.findByRole('heading', { name: 'Supermercado' });
+  expect(screen.queryByLabelText('Ações de Supermercado')).toBeNull();
 });

@@ -222,3 +222,22 @@ export function transactionGroupKey(
   if (row.creditCardId) return 'card:' + row.creditCardId;
   return row.recurrenceId ? 'expenseFixed' : 'expenseOther';
 }
+
+export type TransactionDeletionScope = 'THIS' | 'THIS_AND_FUTURE' | 'ALL';
+export interface TransactionDeletionOption {
+  scope: TransactionDeletionScope;
+  count: number;
+  firstInstallment: number | null;
+  lastInstallment: number | null;
+}
+export interface TransactionDeletionOptions {
+  options: TransactionDeletionOption[];
+  blockedReason: string | null;
+  installmentCount: number | null;
+}
+export interface TransactionDeletionResult {
+  id: string;
+  deleted: true;
+  deletedCount: number;
+  deletedInvoiceIds: string[];
+}

@@ -323,7 +323,12 @@ test('FIN-9: visão mensal e exclusão definitiva no PostgreSQL', async (t) => {
           await db.installmentGroup.count({ where: { id: retro.id } }),
           0,
         );
-        await remove(notebook.installments[0].id, { expected: 409 });
+        await remove(notebook.installments[0].id);
+        assert.equal(
+          (await call('/installment-groups/' + notebook.id)).installments[0]
+            .installmentNumber,
+          6,
+        );
       },
     );
     await t.test(

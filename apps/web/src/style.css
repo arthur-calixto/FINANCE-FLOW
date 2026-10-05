@@ -1165,3 +1165,14 @@ dialog::backdrop {
     font-size: 0.63rem;
   }
 }
+
+.invoice-row-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 1150px) {
+  .invoice-row-actions .row-menu[open] > div {
+    left: auto;
+    right: 0;
+  }
+}

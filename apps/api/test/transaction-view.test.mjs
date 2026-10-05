@@ -57,3 +57,26 @@ test('Hard delete exige confirmação literal explícita, sem campos protegidos'
       false,
     );
 });
+test('Scopes de exclusão preservam contrato individual e rejeitam confirmação ambígua', () => {
+  assert.equal(
+    permanentlyDeleteTransactionSchema.parse({ confirm: true }).scope,
+    'THIS',
+  );
+  for (const scope of ['THIS', 'THIS_AND_FUTURE', 'ALL'])
+    assert.ok(
+      permanentlyDeleteTransactionSchema.safeParse({
+        confirm: true,
+        scope,
+        expectedCount: 6,
+      }).success,
+    );
+  for (const body of [
+    { confirm: true, scope: 'FROM' },
+    { confirm: true, scope: 'ALL', expectedCount: 0 },
+    { confirm: true, scope: 'ALL', expectedCount: 1.5 },
+  ])
+    assert.equal(
+      permanentlyDeleteTransactionSchema.safeParse(body).success,
+      false,
+    );
+});
