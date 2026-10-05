@@ -1,3 +1,5 @@
+import { useSearchParams } from 'react-router-dom';
+import { monthSchema } from '@finance-flow/validation';
 import { PermanentDeletionDialog } from './PermanentDeletionDialog';
 import { RecurrenceEdit } from './RecurrenceEdit';
 import { InstallmentForm } from './InstallmentForm';
@@ -51,6 +53,7 @@ type TransactionDialogProps = {
   accounts: AccountRecord[];
   categories: CategoryRecord[];
   workspaceId: string;
+  defaultDate?: string;
   close: () => void;
   saved: () => void;
 };
@@ -71,6 +74,7 @@ function TransactionFormDialog({
   accounts,
   categories,
   workspaceId,
+  defaultDate,
   close,
   saved,
 }: Omit<TransactionDialogProps, 'editor'> & {
@@ -240,7 +244,9 @@ function TransactionFormDialog({
                     type="date"
                     name="transactionDate"
                     required
-                    defaultValue={row?.transactionDate ?? brazilToday()}
+                    defaultValue={
+                      row?.transactionDate ?? defaultDate ?? brazilToday()
+                    }
                   />
                 </FormField>
                 <FormField
@@ -251,7 +257,7 @@ function TransactionFormDialog({
                     type="date"
                     name="dueDate"
                     required
-                    defaultValue={row?.dueDate ?? brazilToday()}
+                    defaultValue={row?.dueDate ?? defaultDate ?? brazilToday()}
                   />
                 </FormField>
               </div>
@@ -401,7 +407,11 @@ function TransactionsContent({ workspaceId }: { workspaceId: string }) {
   const { me } = useAuth();
   const writable =
     me?.workspaces.find((w) => w.id === workspaceId)?.role !== 'VIEWER';
-  const [month, setMonth] = useState(brazilToday().slice(0, 7));
+  const [params] = useSearchParams();
+  const [month, setMonth] = useState(() => {
+    const parsed = monthSchema.safeParse(params.get('month'));
+    return parsed.success ? parsed.data : brazilToday().slice(0, 7);
+  });
   const [search, setSearch] = useState(''),
     [status, setStatus] = useState(''),
     [accountId, setAccount] = useState(''),

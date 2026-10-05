@@ -1222,3 +1222,318 @@ dialog::backdrop {
     flex-wrap: wrap;
   }
 }
+
+/* Dashboard: prioridade de leitura preservada em telas pequenas. */
+.dashboard {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.dashboard .page-heading {
+  margin-bottom: 0;
+}
+.dashboard-actions,
+.dashboard-month,
+.dashboard-section-heading,
+.dashboard-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.dashboard-month {
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #dce5df;
+  border-radius: 14px;
+}
+.dashboard-month .form-field {
+  margin: 0;
+}
+.dashboard-month > strong {
+  margin-right: auto;
+  text-transform: capitalize;
+}
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.dashboard .card {
+  min-width: 0;
+}
+.dashboard h2 {
+  font-size: 1.15rem;
+  margin: 0.5rem 0 1.25rem;
+}
+.dashboard dl {
+  margin: 0;
+}
+.dashboard-metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.dashboard-metric dt {
+  color: #526b62;
+  font-size: 0.88rem;
+}
+.dashboard-metric dd {
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.dashboard-metric-main {
+  display: block;
+  margin: 1.25rem 0;
+}
+.dashboard-metric-main dd {
+  font-size: clamp(1.3rem, 1.7vw, 1.85rem);
+  margin-top: 0.5rem;
+  letter-spacing: -0.04em;
+}
+.dashboard-result {
+  border-top: 4px solid #196d54;
+  background: #f0f7f2;
+}
+.dashboard-result p,
+.dashboard-analysis p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #526b62;
+}
+.dashboard-negative {
+  color: #a23636;
+}
+.dashboard-current,
+.dashboard-analysis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.dashboard-section-heading {
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.dashboard-section-heading h2 {
+  margin-bottom: 0;
+}
+.dashboard-list,
+.dashboard-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.dashboard-list > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #e5ece7;
+}
+.dashboard-list > li > div:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dashboard-list p {
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+  color: #526b62;
+}
+.dashboard small {
+  color: #526b62;
+  font-size: 0.8rem;
+}
+.dashboard-due {
+  display: grid;
+  gap: 0.35rem;
+  text-align: right;
+  font-size: 0.9rem;
+}
+.dashboard-list > li > strong {
+  min-width: 7rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.dashboard-card-list > li {
+  padding: 1rem 0;
+  border-bottom: 1px solid #e5ece7;
+}
+.dashboard-bar-item {
+  margin: 1.3rem 0;
+}
+.dashboard-bar-item > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+.dashboard-bar {
+  height: 7px;
+  background: #e7eee9;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 0.65rem;
+}
+.dashboard-bar > span {
+  display: block;
+  height: 100%;
+  background: #278768;
+  border-radius: inherit;
+}
+.dashboard-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+}
+.dashboard-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 0.4rem;
+  border-radius: 3px;
+}
+.series-income {
+  fill: #278768;
+  background: #278768;
+}
+.series-expense {
+  fill: #c78343;
+  background: #c78343;
+}
+.series-result {
+  fill: #526faa;
+  background: #526faa;
+}
+.dashboard-chart {
+  margin: 1.5rem 0;
+}
+.dashboard-chart svg {
+  width: 100%;
+  max-height: 320px;
+  display: block;
+}
+.dashboard-axis {
+  stroke: #9cafa5;
+  stroke-width: 1;
+}
+.dashboard-axis-label {
+  fill: #526b62;
+  font-size: 12px;
+}
+.dashboard-chart figcaption {
+  font-size: 0.8rem;
+  color: #526b62;
+  margin-top: 0.75rem;
+}
+.dashboard-evolution-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.dashboard-evolution-values > div {
+  background: #f7faf8;
+  border-radius: 10px;
+  padding: 1rem;
+}
+.dashboard-evolution-values h3 {
+  font-size: 0.9rem;
+  text-transform: capitalize;
+  margin: 0 0 0.75rem;
+}
+.dashboard-evolution-values .dashboard-metric {
+  font-size: 0.85rem;
+}
+.dashboard-empty {
+  color: #526b62;
+  padding: 1rem 0;
+  line-height: 1.6;
+}
+@media (max-width: 1200px) {
+  .dashboard-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-evolution-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .dashboard-current,
+  .dashboard-analysis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-result {
+    order: -1;
+  }
+  .dashboard-actions {
+    width: 100%;
+  }
+  .dashboard-actions .button {
+    flex: 1;
+  }
+  .dashboard-month > strong {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .dashboard-month .form-field {
+    flex: 1;
+    min-width: 0;
+  }
+  .dashboard-month input {
+    min-width: 0;
+    width: 100%;
+  }
+  .dashboard-list > li {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .dashboard-list > li > div:first-child {
+    flex-basis: 60%;
+  }
+  .dashboard-list > li > strong {
+    text-align: left;
+  }
+  .dashboard-evolution-values {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dashboard-metric-main dd {
+    font-size: 1.7rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-month {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .dashboard-month > strong {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .dashboard-month > .form-field {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .dashboard-month > .button:first-child {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .dashboard-month > .button[aria-label='Próximo mês'] {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .dashboard-month > .button:last-child {
+    grid-column: 1 / -1;
+  }
+}

@@ -20,6 +20,15 @@ import { PrismaService } from '../prisma.service';
 import { databaseOperation } from './database-errors';
 import { asDate, civil, purchaseCalendar } from './card-calendar';
 const Money = Prisma.Decimal.clone({ precision: 40 });
+const unpaidPurchases = (
+  workspaceId: string,
+  creditCardId?: string,
+): Prisma.TransactionWhereInput => ({
+  workspaceId,
+  ...(creditCardId ? { creditCardId } : { creditCardId: { not: null } }),
+  status: { not: 'CANCELLED' },
+  invoice: { status: { not: 'PAID' } },
+});
 @Injectable()
 export class CreditCardsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -38,12 +47,7 @@ export class CreditCardsService {
     creditCardId: string,
   ) {
     const result = await tx.transaction.aggregate({
-      where: {
-        workspaceId,
-        creditCardId,
-        status: { not: 'CANCELLED' },
-        invoice: { status: { not: 'PAID' } },
-      },
+      where: unpaidPurchases(workspaceId, creditCardId),
       _sum: { amount: true },
     });
     return new Money(result._sum.amount?.toString() ?? 0);
@@ -62,6 +66,13 @@ export class CreditCardsService {
       _sum: { amount: true },
       _count: true,
     });
+    return this.presentInvoice(row, sum._sum.amount, sum._count);
+  }
+  private presentInvoice(
+    row: CreditCardInvoice,
+    amount: Prisma.Decimal | null,
+    count: number,
+  ) {
     const today = brazilToday();
     return {
       ...row,
@@ -77,45 +88,90 @@ export class CreditCardsService {
             : civil(row.closingDate) <= today
               ? 'CLOSED'
               : 'OPEN',
-      total: sum._sum.amount?.toFixed(2) ?? '0.00',
-      purchaseCount: sum._count,
+      total: amount?.toFixed(2) ?? '0.00',
+      purchaseCount: count,
     };
   }
-  private async cardView(tx: Prisma.TransactionClient, card: CreditCard) {
-    const used = await this.used(tx, card.workspaceId, card.id);
-    const next = await tx.creditCardInvoice.findFirst({
+  private async cardViews(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    cards: CreditCard[],
+  ) {
+    if (!cards.length) return [];
+    const used = await tx.transaction.groupBy({
+      by: ['creditCardId'],
       where: {
-        workspaceId: card.workspaceId,
-        creditCardId: card.id,
-        status: { not: 'PAID' },
-        transactions: { some: { status: { not: 'CANCELLED' } } },
+        ...unpaidPurchases(workspaceId),
+        creditCardId: { in: cards.map((c) => c.id) },
       },
-      orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
+      _sum: { amount: true },
     });
-    return {
-      ...card,
-      creditLimit: card.creditLimit.toFixed(2),
-      usedLimit: used.toFixed(2),
-      availableLimit: new Money(card.creditLimit.toString())
-        .minus(used)
-        .toFixed(2),
-      currentInvoice: next ? await this.invoiceView(tx, next) : null,
-    };
+    // Uma fatura por cartão, escolhida no banco, sem carregar seu histórico.
+    const next = await tx.$queryRaw<CreditCardInvoice[]>`
+      SELECT DISTINCT ON (i."creditCardId") i.* FROM "CreditCardInvoice" i
+      WHERE i."workspaceId" = ${workspaceId}::uuid AND i.status <> 'PAID'
+        AND i."creditCardId" IN (${Prisma.join(cards.map((c) => Prisma.sql`${c.id}::uuid`))})
+        AND EXISTS (SELECT 1 FROM "Transaction" t WHERE t."workspaceId" = ${workspaceId}::uuid AND t."invoiceId" = i.id AND t."creditCardId" = i."creditCardId" AND t.status <> 'CANCELLED')
+      ORDER BY i."creditCardId", i."dueDate", i.id`;
+    const sums = next.length
+      ? await tx.transaction.groupBy({
+          by: ['invoiceId'],
+          where: {
+            workspaceId,
+            invoiceId: { in: next.map((i) => i.id) },
+            OR: next.map((i) => ({
+              invoiceId: i.id,
+              creditCardId: i.creditCardId,
+            })),
+            status: { not: 'CANCELLED' },
+          },
+          _sum: { amount: true },
+          _count: true,
+        })
+      : [];
+    const usedByCard = new Map(
+      used.map((g) => [g.creditCardId, g._sum.amount]),
+    );
+    const nextByCard = new Map(next.map((i) => [i.creditCardId, i]));
+    const invoiceSums = new Map(sums.map((g) => [g.invoiceId, g]));
+    return cards.map((card) => {
+      const used = new Money(usedByCard.get(card.id)?.toString() ?? '0');
+      const invoice = nextByCard.get(card.id);
+      const sum = invoice ? invoiceSums.get(invoice.id) : undefined;
+      return {
+        ...card,
+        creditLimit: card.creditLimit.toFixed(2),
+        usedLimit: used.toFixed(2),
+        availableLimit: new Money(card.creditLimit.toString())
+          .minus(used)
+          .toFixed(2),
+        currentInvoice: invoice
+          ? this.presentInvoice(
+              invoice,
+              sum?._sum.amount ?? null,
+              sum?._count ?? 0,
+            )
+          : null,
+      };
+    });
+  }
+  private async cardView(tx: Prisma.TransactionClient, card: CreditCard) {
+    return (await this.cardViews(tx, card.workspaceId, [card]))[0];
+  }
+  async listInTransaction(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    includeInactive = false,
+  ) {
+    const cards = await tx.creditCard.findMany({
+      where: { workspaceId, ...(includeInactive ? {} : { isActive: true }) },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+    return this.cardViews(tx, workspaceId, cards);
   }
   list(workspaceId: string, includeInactive: boolean) {
     return this.prisma.client.$transaction(
-      async (tx) => {
-        const rows = await tx.creditCard.findMany({
-          where: {
-            workspaceId,
-            ...(includeInactive ? {} : { isActive: true }),
-          },
-          orderBy: [{ name: 'asc' }, { id: 'asc' }],
-        });
-        const result = [];
-        for (const row of rows) result.push(await this.cardView(tx, row));
-        return result;
-      },
+      (tx) => this.listInTransaction(tx, workspaceId, includeInactive),
       { isolationLevel: 'RepeatableRead' },
     );
   }

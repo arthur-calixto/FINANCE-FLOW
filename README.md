@@ -122,3 +122,11 @@ Cada pessoa usa sua própria conta; seu workspace pessoal permanece privado.
 OWNER administra membros, enquanto MEMBER pode gerenciar todas as finanças do
 workspace compartilhado. Consulte [Membros e convites](docs/workspace-sharing.md)
 para endpoints, segurança, expiração, revogação e limitações do MVP.
+
+### Dashboard financeiro
+
+A página inicial `/app` reúne receitas, despesas, pendências e resultados por
+competência, próximos vencimentos, categorias, composição e evolução de seis meses.
+Contas e cartões mostram saldos e limites atuais. As ações rápidas reutilizam o
+formulário de lançamentos. Consulte [Dashboard financeiro](docs/dashboard.md) para
+as regras de cálculo, reconciliação, tratamento de faturas e contrato da API.

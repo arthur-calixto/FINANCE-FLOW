@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from './auth';
-import { Button, Card, ErrorState, Select } from './ui';
+import { Button, ErrorState, Select } from './ui';
 export function AppShell() {
   const auth = useAuth();
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export function AppShell() {
         <nav aria-label="Navegação principal" className="main-nav">
           <span className="nav-caption">Organize sua vida financeira</span>
           <NavLink to="/app" end>
-            ⌂ <span>Visão geral</span>
+            ⌂ <span>Dashboard</span>
           </NavLink>
           <NavLink to="/app/transactions">
             ↗ <span>Lançamentos</span>
@@ -119,47 +119,5 @@ export function AppShell() {
         </main>
       </div>
     </div>
-  );
-}
-export function Overview() {
-  const auth = useAuth();
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">Seu dinheiro, com mais clareza</span>
-          <h1>Olá, {auth.me?.user.name.split(' ')[0]}.</h1>
-          <p>Vamos organizar a base da sua vida financeira?</p>
-        </div>
-      </div>
-      <div className="welcome-grid">
-        <Card>
-          <span className="feature-symbol" aria-hidden="true">
-            ▣
-          </span>
-          <h2>Suas contas, em um só lugar</h2>
-          <p>
-            Comece pelas contas que você usa no dia a dia e informe o saldo de
-            partida.
-          </p>
-          <Link className="button button-primary" to="/app/accounts">
-            Organizar contas →
-          </Link>
-        </Card>
-        <Card>
-          <span className="feature-symbol" aria-hidden="true">
-            ⌑
-          </span>
-          <h2>Cada coisa no seu lugar</h2>
-          <p>
-            Crie categorias que façam sentido para a sua rotina, do mercado ao
-            salário.
-          </p>
-          <Link className="button button-secondary" to="/app/categories">
-            Organizar categorias →
-          </Link>
-        </Card>
-      </div>
-    </>
   );
 }

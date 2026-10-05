@@ -1,3 +1,6 @@
+import { DashboardController } from './dashboard/dashboard.controller';
+import { DashboardService } from './dashboard/dashboard.service';
+import { AccountBalancesService } from './resources/account-balances.service';
 import {
   SharingController,
   InvitationsController,
@@ -29,6 +32,7 @@ import { IdentityController } from './auth/identity.controller';
 @Module({
   controllers: [
     HealthController,
+    DashboardController,
     SharingController,
     InvitationsController,
     IdentityController,
@@ -41,6 +45,8 @@ import { IdentityController } from './auth/identity.controller';
   ],
   providers: [
     PrismaService,
+    DashboardService,
+    AccountBalancesService,
     SharingService,
     AccountsService,
     CategoriesService,

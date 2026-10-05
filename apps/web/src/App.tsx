@@ -5,7 +5,8 @@ import { InstallmentGroup } from './resources/InstallmentGroup';
 import { CreditCards } from './resources/CreditCards';
 import { CardInvoices } from './resources/CardInvoices';
 import { Transactions } from './resources/Transactions';
-import { AppShell, Overview } from './Shell';
+import { AppShell } from './Shell';
+import { Dashboard } from './Dashboard';
 import { Accounts } from './resources/Accounts';
 import { Categories } from './resources/Categories';
 import { useState } from 'react';
@@ -225,7 +226,7 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Overview />} />
+        <Route index element={<Dashboard />} />
         <Route path="settings" element={<WorkspaceSettings />} />
         <Route path="installment-groups/:id" element={<InstallmentGroup />} />
         <Route path="credit-cards" element={<CreditCards />} />

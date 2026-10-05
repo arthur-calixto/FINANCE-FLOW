@@ -241,3 +241,51 @@ export interface TransactionDeletionResult {
   deletedCount: number;
   deletedInvoiceIds: string[];
 }
+
+export interface DashboardSummary {
+  income: { planned: string; actual: string; pending: string };
+  expense: { planned: string; actual: string; pending: string };
+  result: { planned: string; actual: string; pending: string };
+}
+export interface DashboardResponse {
+  month: string;
+  hasActivity: boolean;
+  transactionCount: number;
+  summary: DashboardSummary;
+  accounts: {
+    totalBalance: string;
+    items: {
+      id: string;
+      name: string;
+      type: AccountType;
+      initialBalance: string;
+      balance: string;
+    }[];
+  };
+  upcoming: {
+    id: string;
+    description: string;
+    type: CategoryType;
+    dueDate: string;
+    amount: string;
+    origin: 'CREDIT_CARD' | 'RECURRING' | 'INSTALLMENT' | 'SINGLE';
+    status: 'OVERDUE' | 'PENDING';
+    creditCardId: string | null;
+    invoiceId: string | null;
+  }[];
+  expensesByCategory: {
+    id: string | null;
+    name: string;
+    amount: string;
+    percentage: string;
+  }[];
+  expenseComposition: {
+    recurring: string;
+    creditCards: string;
+    other: string;
+    total: string;
+    percentages: { recurring: string; creditCards: string; other: string };
+  };
+  creditCards: (CreditCardRecord & { usagePercentage: string })[];
+  evolution: (DashboardSummary & { month: string })[];
+}

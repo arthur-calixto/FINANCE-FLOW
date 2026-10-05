@@ -386,3 +386,12 @@ export const createInvitationSchema = z
   })
   .strict();
 export const invitationTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+export const dashboardQuerySchema = z
+  .object({
+    month: monthSchema.refine(
+      (v) => v >= '0001-06',
+      'Selecione um mês com seis competências válidas.',
+    ),
+  })
+  .strict();
