@@ -62,30 +62,33 @@ enum InvoiceStatus {
 
 model User {
   /// Identidade Supabase explícita; nullable apenas para registros legados não vinculados.
-  authUserId               String?              @unique @db.Uuid
-  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                    String               @unique
+  authUserId               String?               @unique @db.Uuid
+  id                       String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                    String                @unique
   name                     String
   avatarUrl                String?
-  createdAt                DateTime             @default(now()) @db.Timestamptz(3)
-  updatedAt                DateTime             @updatedAt @db.Timestamptz(3)
+  createdAt                DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime              @updatedAt @db.Timestamptz(3)
   ownedWorkspaces          Workspace[]
   memberships              WorkspaceMember[]
   createdTransactions      Transaction[]
   createdInstallmentGroups InstallmentGroup[]
   createdRecurrences       Recurrence[]
   recurrenceRevisions      RecurrenceRevision[]
+  sentInvitations          WorkspaceInvitation[] @relation("InvitationSender")
+  acceptedInvitations      WorkspaceInvitation[] @relation("InvitationAcceptor")
   createdTransfers         Transfer[]
 }
 
 model Workspace {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name               String
   type               WorkspaceType
-  ownerId            String              @db.Uuid
-  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
-  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ownerId            String                @db.Uuid
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+  owner              User                  @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  invitations        WorkspaceInvitation[]
   workspaceMembers   WorkspaceMember[]
   accounts           Account[]
   categories         Category[]
@@ -398,4 +401,35 @@ model RecurrenceOccurrenceExclusion {
 
   @@id([recurrenceId, recurrenceDate])
   @@index([workspaceId, recurrenceId])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  EXPIRED
+  DECLINED
+}
+
+/// Índice parcial SQL garante um convite PENDING por workspace/e-mail.
+model WorkspaceInvitation {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String           @db.Uuid
+  email            String
+  role             WorkspaceRole    @default(MEMBER)
+  tokenHash        String           @unique @db.VarChar(64)
+  status           InvitationStatus @default(PENDING)
+  expiresAt        DateTime         @db.Timestamptz(3)
+  invitedByUserId  String           @db.Uuid
+  acceptedByUserId String?          @db.Uuid
+  acceptedAt       DateTime?        @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inviter          User             @relation("InvitationSender", fields: [invitedByUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  acceptor         User?            @relation("InvitationAcceptor", fields: [acceptedByUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([workspaceId, status])
+  @@index([invitedByUserId])
+  @@index([acceptedByUserId])
 }

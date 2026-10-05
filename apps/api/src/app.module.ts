@@ -1,3 +1,8 @@
+import {
+  SharingController,
+  InvitationsController,
+} from './sharing/sharing.controller';
+import { SharingService } from './sharing/sharing.service';
 import { RecurrencesController } from './resources/recurrences.controller';
 import { RecurrencesService } from './resources/recurrences.service';
 import { RecurrenceClock } from './resources/recurrence-calendar';
@@ -24,6 +29,8 @@ import { IdentityController } from './auth/identity.controller';
 @Module({
   controllers: [
     HealthController,
+    SharingController,
+    InvitationsController,
     IdentityController,
     AccountsController,
     CategoriesController,
@@ -34,6 +41,7 @@ import { IdentityController } from './auth/identity.controller';
   ],
   providers: [
     PrismaService,
+    SharingService,
     AccountsService,
     CategoriesService,
     TransactionsService,

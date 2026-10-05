@@ -202,7 +202,21 @@ BEGIN
   PERFORM pg_temp.expect_error(format('UPDATE "RecurrenceOccurrenceExclusion" SET "workspaceId" = %L WHERE "recurrenceId" = %L', ws[2], recurrences[1]), '23503');
   PERFORM pg_temp.expect_error(format('UPDATE "InstallmentGroup" SET "startingInstallment" = 0 WHERE id = %L', groups[1]), '23514');
   PERFORM pg_temp.expect_error(format('UPDATE "InstallmentGroup" SET "startingInstallment" = "installmentCount" + 1 WHERE id = %L', groups[1]), '23514');
-  RAISE NOTICE 'OK: 13 models exercitados; isolamento, unicidade, datas, Decimal, CHECKs, Transfer.updatedAt e exclusões validados';
+  INSERT INTO "WorkspaceInvitation" ("workspaceId", email, "tokenHash", "expiresAt", "invitedByUserId", "updatedAt")
+    VALUES (ws[1], 'invite@schema-test.invalid', repeat('a', 64), now() + interval '7 days', user_id, now());
+  PERFORM pg_temp.expect_error(format(
+    'INSERT INTO "WorkspaceInvitation" ("workspaceId", email, "tokenHash", "expiresAt", "invitedByUserId", "updatedAt") VALUES (%L, %L, %L, now(), %L, now())',
+    ws[1], 'invite@schema-test.invalid', repeat('b', 64), user_id), '23505');
+  PERFORM pg_temp.expect_error('UPDATE "WorkspaceInvitation" SET role = ''OWNER'' WHERE email = ''invite@schema-test.invalid''', '23514');
+  PERFORM pg_temp.expect_error('UPDATE "WorkspaceInvitation" SET email = ''UPPER@schema-test.invalid'' WHERE email = ''invite@schema-test.invalid''', '23514');
+  PERFORM pg_temp.expect_error('UPDATE "WorkspaceInvitation" SET status = ''ACCEPTED'' WHERE email = ''invite@schema-test.invalid''', '23514');
+  PERFORM pg_temp.expect_error('UPDATE "WorkspaceInvitation" SET "tokenHash" = ''plaintext'' WHERE email = ''invite@schema-test.invalid''', '23514');
+  PERFORM pg_temp.expect_error(format('UPDATE "WorkspaceInvitation" SET "invitedByUserId" = %L WHERE email = ''invite@schema-test.invalid''', gen_random_uuid()), '23503');
+  UPDATE "WorkspaceInvitation" SET status = 'CANCELLED' WHERE email = 'invite@schema-test.invalid';
+  INSERT INTO "WorkspaceInvitation" ("workspaceId", email, "tokenHash", "expiresAt", "invitedByUserId", "updatedAt")
+    VALUES (ws[1], 'invite@schema-test.invalid', repeat('b', 64), now() + interval '7 days', user_id, now());
+
+  RAISE NOTICE 'OK: 14 models exercitados; isolamento, unicidade, datas, Decimal, CHECKs, Transfer.updatedAt e exclusões validados';
 END;
 $$;
 ROLLBACK;

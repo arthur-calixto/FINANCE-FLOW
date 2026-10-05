@@ -1176,3 +1176,49 @@ dialog::backdrop {
     right: 0;
   }
 }
+
+.sharing-page {
+  display: grid;
+  gap: 1.25rem;
+}
+.sharing-row,
+.sharing-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.sharing-actions {
+  justify-content: flex-start;
+}
+.sharing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sharing-list > li {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  overflow-wrap: anywhere;
+}
+.sharing-list > li:last-child {
+  border-bottom: 0;
+}
+.sharing-list p {
+  margin: 0.35rem 0;
+}
+.sharing-invitation .form-field {
+  margin-top: 1rem;
+}
+.sharing-page .card {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .sharing-row {
+    align-items: flex-start;
+  }
+  .sharing-page .page-heading {
+    flex-wrap: wrap;
+  }
+}

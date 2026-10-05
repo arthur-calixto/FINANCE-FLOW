@@ -1,3 +1,5 @@
+import { WorkspaceSettings, InvitePage } from './sharing';
+import { inviteAuthPath, inviteReturnPath } from './invite-return';
 import { Recurrences } from './resources/Recurrences';
 import { InstallmentGroup } from './resources/InstallmentGroup';
 import { CreditCards } from './resources/CreditCards';
@@ -15,6 +17,7 @@ import {
   Route,
   Routes,
   useNavigate,
+  useLocation,
 } from 'react-router-dom';
 import {
   z,
@@ -39,6 +42,8 @@ function AuthForm({
 }) {
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const next = inviteReturnPath(location.search);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -50,7 +55,12 @@ function AuthForm({
   }[mode];
   if (auth.loading && mode !== 'reset') return <p role="status">Carregando…</p>;
   if (auth.session && (mode === 'login' || mode === 'register'))
-    return <Navigate to={auth.recovery ? '/reset-password' : '/app'} replace />;
+    return (
+      <Navigate
+        to={auth.recovery ? '/reset-password' : (next ?? '/app')}
+        replace
+      />
+    );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
@@ -182,8 +192,8 @@ function AuthForm({
         {error && <p role="alert">{error}</p>}
         {message && <p role="status">{message}</p>}
         <nav>
-          <Link to="/login">Entrar</Link>
-          <Link to="/register">Criar conta</Link>
+          <Link to={inviteAuthPath('/login', next)}>Entrar</Link>
+          <Link to={inviteAuthPath('/register', next)}>Criar conta</Link>
           <Link to="/forgot-password">Esqueci minha senha</Link>
         </nav>
       </section>
@@ -193,6 +203,7 @@ function AuthForm({
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/invite/:token" element={<InvitePage />} />
       <Route path="/login" element={<AuthForm key="login" mode="login" />} />
       <Route
         path="/register"
@@ -215,6 +226,7 @@ export function AppRoutes() {
         }
       >
         <Route index element={<Overview />} />
+        <Route path="settings" element={<WorkspaceSettings />} />
         <Route path="installment-groups/:id" element={<InstallmentGroup />} />
         <Route path="credit-cards" element={<CreditCards />} />
         <Route

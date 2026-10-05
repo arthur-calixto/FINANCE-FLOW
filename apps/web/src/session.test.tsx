@@ -127,3 +127,29 @@ it('remove listener ao desmontar', () => {
   view.unmount();
   expect(sdk.unsubscribe).toHaveBeenCalledOnce();
 });
+
+it('403 com JWT válido atualiza memberships e abandona workspace revogado', async () => {
+  const shared: MeResponse = {
+    ...me,
+    workspaces: [
+      ...me.workspaces,
+      { id: 'family', name: 'Família', type: 'FAMILY', role: 'MEMBER' },
+    ],
+  };
+  localStorage.setItem('ff:workspace:auth-user-a', 'family');
+  sdk.getMe.mockResolvedValue(shared);
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  );
+  await emit('SIGNED_IN', session);
+  await screen.findByText('family');
+  sdk.getMe.mockResolvedValue(me);
+  await act(async () =>
+    window.dispatchEvent(new Event('ff:workspace-forbidden')),
+  );
+  await screen.findByText('workspace-a');
+  expect(screen.queryByText('family')).toBeNull();
+  expect(screen.getByText('signed-in')).toBeTruthy();
+});

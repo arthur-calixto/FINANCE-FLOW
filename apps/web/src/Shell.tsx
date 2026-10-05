@@ -75,6 +75,9 @@ export function AppShell() {
           <NavLink to="/app/categories">
             ⌑ <span>Categorias</span>
           </NavLink>
+          <NavLink to="/app/settings">
+            ⚙ <span>Configurações</span>
+          </NavLink>
         </nav>
         <div className="sidebar-note">
           Um lugar para cuidar

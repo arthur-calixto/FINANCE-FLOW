@@ -114,3 +114,11 @@ Receitas/despesas mensais e anuais com janela móvel de 12 meses, prévia, ediç
 ## Visão mensal e exclusão definitiva — FIN-9
 
 Lançamentos agrupados por receitas/despesas, recorrentes, cartões e outros, com subtotais e resultado previsto/realizado. Cancelar mantém histórico; excluir definitivamente remove o registro mediante confirmação e regras de integridade. Aplique a migration aditiva `20260930122000_transaction_deletion` com `pnpm db:migrate`, sem reset. Contratos, tombstones de recorrência, proteção de faturas pagas e validação em [docs/transactions-view.md](docs/transactions-view.md). Dashboard permanece na FIN-10.
+
+### Compartilhamento familiar
+
+Em **Configurações**, crie um workspace familiar e convide pessoas por link.
+Cada pessoa usa sua própria conta; seu workspace pessoal permanece privado.
+OWNER administra membros, enquanto MEMBER pode gerenciar todas as finanças do
+workspace compartilhado. Consulte [Membros e convites](docs/workspace-sharing.md)
+para endpoints, segurança, expiração, revogação e limitações do MVP.

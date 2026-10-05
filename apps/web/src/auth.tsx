@@ -1,3 +1,4 @@
+import { inviteAuthPath, inviteReturnPath } from './invite-return';
 import {
   createContext,
   useContext,
@@ -55,6 +56,7 @@ interface AuthContextValue {
   signUp(name: string, email: string, password: string): Promise<boolean>;
   signOut(): Promise<void>;
   switchWorkspace(id: string): Promise<void>;
+  refreshWorkspaces(preferredId?: string): Promise<void>;
   retry(): void;
   completeRecovery(): void;
 }
@@ -94,13 +96,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.unsubscribe();
   }, []);
+  const refreshSequence = useRef(0);
   useEffect(() => {
     if (!session || recovery) return;
+    const sequence = ++refreshSequence.current;
     const controller = new AbortController();
     const identity = session.user.id;
     getMe(controller.signal)
       .then((result) => {
-        if (controller.signal.aborted || identityRef.current !== identity)
+        if (
+          controller.signal.aborted ||
+          identityRef.current !== identity ||
+          sequence !== refreshSequence.current
+        )
           return;
         const key = `ff:workspace:${identity}`;
         const selected = chooseWorkspace(
@@ -120,6 +128,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     return () => controller.abort();
   }, [session, recovery, attempt]);
+  const refreshWorkspaces = useCallback(async (preferredId?: string) => {
+    const identity = identityRef.current;
+    if (!identity) return;
+    const sequence = ++refreshSequence.current;
+    const result = await getMe();
+    if (
+      identityRef.current !== identity ||
+      sequence !== refreshSequence.current
+    )
+      return;
+    const key = `ff:workspace:${identity}`;
+    const selected = chooseWorkspace(
+      result.workspaces.map((w) => w.id),
+      preferredId ?? storage.get(key),
+    );
+    setMe(result);
+    setActive(selected);
+    storage.set(key, selected);
+    setError(null);
+  }, []);
+  useEffect(() => {
+    const refresh = () => {
+      if (identityRef.current && me && !recovery)
+        void refreshWorkspaces().catch(() => {
+          /* Retry on next focus/request. */
+        });
+    };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('ff:workspace-forbidden', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('ff:workspace-forbidden', refresh);
+    };
+  }, [refreshWorkspaces, recovery, me]);
   const signOut = useCallback(async () => {
     const { error: logoutError } = await supabase!.auth.signOut({
       scope: 'local',
@@ -158,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         options: {
           data: { name },
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: `${window.location.origin}${inviteAuthPath('/login', inviteReturnPath())}`,
         },
       });
       if (error)
@@ -168,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return !data.session;
     },
     signOut,
+    refreshWorkspaces,
     async switchWorkspace(id) {
       const current = session?.user.id;
       const workspace = await selectWorkspace(id);

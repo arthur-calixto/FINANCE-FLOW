@@ -51,6 +51,39 @@ export async function apiRequest(
     },
   );
   if (!response.ok) {
+    if (response.status === 403 && workspaceId)
+      window.dispatchEvent(new Event('ff:workspace-forbidden'));
+    if (
+      (path.startsWith('/workspaces') || path.startsWith('/invitations')) &&
+      [400, 403, 404, 409].includes(response.status)
+    ) {
+      const body =
+        typeof response.json === 'function'
+          ? ((await response.json().catch(() => null)) as {
+              message?: unknown;
+            } | null)
+          : null;
+      const safeMessages = new Set([
+        'Somente OWNER pode administrar este workspace.',
+        'Somente workspaces familiares podem ser compartilhados.',
+        'Você não pode convidar a si próprio.',
+        'Este usuário já faz parte do workspace.',
+        'Convite não encontrado.',
+        'Este convite não está pendente.',
+        'Convite inválido.',
+        'Este convite foi enviado para outro endereço de e-mail.',
+        'Este convite não está mais disponível.',
+        'Membro não encontrado.',
+        'Somente MEMBER pode ser removido. O OWNER deve permanecer no workspace.',
+      ]);
+      throw new ApiError(
+        response.status,
+        typeof body?.message === 'string' && safeMessages.has(body.message)
+          ? body.message
+          : undefined,
+      );
+    }
+
     const allowed = new Set([
       'A compra ultrapassa o limite disponível.',
       'O total deve permitir pelo menos R$ 0,01 por parcela.',

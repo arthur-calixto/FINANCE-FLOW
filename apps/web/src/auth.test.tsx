@@ -140,3 +140,21 @@ describe('autenticação Web', () => {
     expect(chooseWorkspace([], 'outro')).toBeNull();
   });
 });
+
+it('login preserva o convite ao navegar para cadastro', async () => {
+  const user = userEvent.setup();
+  const next = '/invite/' + 'a'.repeat(43);
+  render(
+    <MemoryRouter initialEntries={['/login?next=' + encodeURIComponent(next)]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByRole('link', { name: 'Criar conta' }).getAttribute('href'),
+  ).toBe('/register?next=' + encodeURIComponent(next));
+  await user.click(screen.getByRole('link', { name: 'Criar conta' }));
+  expect(screen.getByRole('heading', { name: 'Criar conta' })).toBeTruthy();
+  expect(
+    screen.getByRole('link', { name: 'Entrar' }).getAttribute('href'),
+  ).toBe('/login?next=' + encodeURIComponent(next));
+});

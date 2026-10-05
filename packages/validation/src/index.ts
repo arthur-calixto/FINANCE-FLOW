@@ -374,3 +374,15 @@ export const permanentlyDeleteTransactionSchema = z
 export type PermanentlyDeleteTransaction = z.infer<
   typeof permanentlyDeleteTransactionSchema
 >;
+
+export const createWorkspaceSchema = z
+  .object({ name: resourceName, type: z.literal('FAMILY') })
+  .strict();
+export const renameWorkspaceSchema = z.object({ name: resourceName }).strict();
+export const createInvitationSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
+    role: z.literal('MEMBER').default('MEMBER'),
+  })
+  .strict();
+export const invitationTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
